@@ -1,99 +1,213 @@
-from src.data.analysis import (
-    AnalysisBundle,
-    CombinationResult,
-    FeatureEngineeringResult,
-    QualityAuditResult,
-    analyze_feature_combinations,
-    audit_data_quality,
-    compute_categorical_summaries,
-    compute_cramers_v,
-    compute_cramers_v_tables,
-    compute_decile_target_curves,
-    compute_numeric_shape_metrics,
-    compute_ranked_target_correlations,
-    compute_spearman_matrix,
-    compute_subgroup_risk_surfaces,
-    compute_target_rates_by_group,
-    engineer_features,
-    infer_risk_floor_threshold,
-    run_full_analysis,
-    run_kruskal_wallis_grid,
-    run_leakage_check,
-    run_mann_whitney_tests,
-    validate_models_cv,
-)
-from src.data.cleaning import (
-    CleaningAudit,
-    CleaningEntry,
-    CleaningResult,
-    clean_dataset,
-    coerce_column_types,
-    finalize_dtypes,
-    handle_missing_and_duplicates,
-    normalize_text_columns,
-    validate_numeric_ranges,
-)
-from src.data.cli import build_parser, main
-from src.data.errors import (
-    EXIT_CODE_TABLE,
-    EXIT_SUCCESS,
-    EXIT_UNEXPECTED,
-    AnalysisError,
-    DataPipelineError,
-    EmptyDataError,
-    InputNotFoundError,
-    InvalidArgumentError,
-    MalformedDataError,
-    MissingColumnError,
-    ReportWriteError,
-    format_cli_error,
-)
-from src.data.loading import (
-    SUPPORTED_EXTENSIONS,
-    load_dataset,
-    load_raw_text,
-    resolve_input_files,
-    save_dataframe,
-)
-from src.data.plotting import (
-    PlotArtifact,
-    generate_all_plots,
-    plot_binary_flag_counts,
-    plot_categorical_counts,
-    plot_continuous_binary_interactions,
-    plot_cramers_v_associations,
-    plot_decile_risk_curves,
-    plot_engineered_features,
-    plot_kruskal_wallis_boxplots,
-    plot_numeric_by_target,
-    plot_numeric_distributions,
-    plot_pairwise_risk_heatmaps,
-    plot_risk_rate_by_category,
-    plot_spearman_correlation,
-    plot_subgroup_risk_surfaces,
-    plot_target_distribution,
-    plot_top_combinations,
-)
-from src.data.report import build_report_markdown, generate_report
-from src.data.schema import (
-    ColumnProfile,
-    DatasetSchema,
-    infer_schema,
-    resolve_drivers,
-)
-from src.data.utils import (
-    DEFAULT_BINARY_MAP,
-    DEFAULT_MISSING_TOKENS,
-    UNIDENTIFIED,
-    compute_min_subgroup_size,
-    configure_logging,
-    dataframe_to_markdown,
-    ensure_directory,
-    is_identified,
-    normalize_label,
-)
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.data.analysis import (
+        AnalysisBundle,
+        CombinationResult,
+        FeatureEngineeringResult,
+        QualityAuditResult,
+        analyze_feature_combinations,
+        audit_data_quality,
+        compute_categorical_summaries,
+        compute_cramers_v,
+        compute_cramers_v_tables,
+        compute_decile_target_curves,
+        compute_numeric_shape_metrics,
+        compute_ranked_target_correlations,
+        compute_spearman_matrix,
+        compute_subgroup_risk_surfaces,
+        compute_target_rates_by_group,
+        engineer_features,
+        infer_risk_floor_threshold,
+        run_full_analysis,
+        run_kruskal_wallis_grid,
+        run_leakage_check,
+        run_mann_whitney_tests,
+        validate_models_cv,
+    )
+    from src.data.cleaning import (
+        CleaningAudit,
+        CleaningEntry,
+        CleaningResult,
+        clean_dataset,
+        coerce_column_types,
+        finalize_dtypes,
+        handle_missing_and_duplicates,
+        normalize_text_columns,
+        validate_numeric_ranges,
+    )
+    from src.data.cli import build_parser, main
+    from src.data.errors import (
+        EXIT_CODE_TABLE,
+        EXIT_SUCCESS,
+        EXIT_UNEXPECTED,
+        AnalysisError,
+        DataPipelineError,
+        EmptyDataError,
+        InputNotFoundError,
+        InvalidArgumentError,
+        MalformedDataError,
+        MissingColumnError,
+        ReportWriteError,
+        format_cli_error,
+    )
+    from src.data.loading import (
+        SUPPORTED_EXTENSIONS,
+        load_dataset,
+        load_raw_text,
+        resolve_input_files,
+        save_dataframe,
+    )
+    from src.data.plotting import (
+        PlotArtifact,
+        generate_all_plots,
+        plot_binary_flag_counts,
+        plot_categorical_counts,
+        plot_continuous_binary_interactions,
+        plot_cramers_v_associations,
+        plot_decile_risk_curves,
+        plot_engineered_features,
+        plot_kruskal_wallis_boxplots,
+        plot_numeric_by_target,
+        plot_numeric_distributions,
+        plot_pairwise_risk_heatmaps,
+        plot_risk_rate_by_category,
+        plot_spearman_correlation,
+        plot_subgroup_risk_surfaces,
+        plot_target_distribution,
+        plot_top_combinations,
+    )
+    from src.data.report import build_report_markdown, generate_report
+    from src.data.schema import (
+        ColumnProfile,
+        DatasetSchema,
+        infer_schema,
+        resolve_drivers,
+    )
+    from src.data.utils import (
+        DEFAULT_BINARY_MAP,
+        DEFAULT_MISSING_TOKENS,
+        UNIDENTIFIED,
+        compute_min_subgroup_size,
+        configure_logging,
+        dataframe_to_markdown,
+        ensure_directory,
+        is_identified,
+        normalize_label,
+    )
+
+_MODULE_EXPORTS: dict[str, tuple[str, ...]] = {
+    "src.data.analysis": (
+        "AnalysisBundle",
+        "CombinationResult",
+        "FeatureEngineeringResult",
+        "QualityAuditResult",
+        "analyze_feature_combinations",
+        "audit_data_quality",
+        "compute_categorical_summaries",
+        "compute_cramers_v",
+        "compute_cramers_v_tables",
+        "compute_decile_target_curves",
+        "compute_numeric_shape_metrics",
+        "compute_ranked_target_correlations",
+        "compute_spearman_matrix",
+        "compute_subgroup_risk_surfaces",
+        "compute_target_rates_by_group",
+        "engineer_features",
+        "infer_risk_floor_threshold",
+        "run_full_analysis",
+        "run_kruskal_wallis_grid",
+        "run_leakage_check",
+        "run_mann_whitney_tests",
+        "validate_models_cv",
+    ),
+    "src.data.cleaning": (
+        "CleaningAudit",
+        "CleaningEntry",
+        "CleaningResult",
+        "clean_dataset",
+        "coerce_column_types",
+        "finalize_dtypes",
+        "handle_missing_and_duplicates",
+        "normalize_text_columns",
+        "validate_numeric_ranges",
+    ),
+    "src.data.cli": ("build_parser", "main"),
+    "src.data.errors": (
+        "EXIT_CODE_TABLE",
+        "EXIT_SUCCESS",
+        "EXIT_UNEXPECTED",
+        "AnalysisError",
+        "DataPipelineError",
+        "EmptyDataError",
+        "InputNotFoundError",
+        "InvalidArgumentError",
+        "MalformedDataError",
+        "MissingColumnError",
+        "ReportWriteError",
+        "format_cli_error",
+    ),
+    "src.data.loading": (
+        "SUPPORTED_EXTENSIONS",
+        "load_dataset",
+        "load_raw_text",
+        "resolve_input_files",
+        "save_dataframe",
+    ),
+    "src.data.plotting": (
+        "PlotArtifact",
+        "generate_all_plots",
+        "plot_binary_flag_counts",
+        "plot_categorical_counts",
+        "plot_continuous_binary_interactions",
+        "plot_cramers_v_associations",
+        "plot_decile_risk_curves",
+        "plot_engineered_features",
+        "plot_kruskal_wallis_boxplots",
+        "plot_numeric_by_target",
+        "plot_numeric_distributions",
+        "plot_pairwise_risk_heatmaps",
+        "plot_risk_rate_by_category",
+        "plot_spearman_correlation",
+        "plot_subgroup_risk_surfaces",
+        "plot_target_distribution",
+        "plot_top_combinations",
+    ),
+    "src.data.report": ("build_report_markdown", "generate_report"),
+    "src.data.schema": (
+        "ColumnProfile",
+        "DatasetSchema",
+        "infer_schema",
+        "resolve_drivers",
+    ),
+    "src.data.utils": (
+        "DEFAULT_BINARY_MAP",
+        "DEFAULT_MISSING_TOKENS",
+        "UNIDENTIFIED",
+        "compute_min_subgroup_size",
+        "configure_logging",
+        "dataframe_to_markdown",
+        "ensure_directory",
+        "is_identified",
+        "normalize_label",
+    ),
+}
+
+_SYMBOL_TO_MODULE: dict[str, str] = {
+    sym: mod for mod, syms in _MODULE_EXPORTS.items() for sym in syms
+}
 
 __all__ = [
+    "DEFAULT_BINARY_MAP",
+    "DEFAULT_MISSING_TOKENS",
+    "EXIT_CODE_TABLE",
+    "EXIT_SUCCESS",
+    "EXIT_UNEXPECTED",
+    "SUPPORTED_EXTENSIONS",
+    "UNIDENTIFIED",
     "AnalysisBundle",
     "AnalysisError",
     "CleaningAudit",
@@ -103,11 +217,6 @@ __all__ = [
     "CombinationResult",
     "DataPipelineError",
     "DatasetSchema",
-    "DEFAULT_BINARY_MAP",
-    "DEFAULT_MISSING_TOKENS",
-    "EXIT_CODE_TABLE",
-    "EXIT_SUCCESS",
-    "EXIT_UNEXPECTED",
     "EmptyDataError",
     "FeatureEngineeringResult",
     "InputNotFoundError",
@@ -117,8 +226,6 @@ __all__ = [
     "PlotArtifact",
     "QualityAuditResult",
     "ReportWriteError",
-    "SUPPORTED_EXTENSIONS",
-    "UNIDENTIFIED",
     "analyze_feature_combinations",
     "audit_data_quality",
     "build_parser",
@@ -177,3 +284,12 @@ __all__ = [
     "validate_models_cv",
     "validate_numeric_ranges",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    mod_name = _SYMBOL_TO_MODULE.get(name)
+    if mod_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(mod_name), name)
+    globals()[name] = value
+    return value

@@ -86,7 +86,9 @@ def get_console(stderr: bool = False) -> Console:
 
 
 def configure_logging(
-    debug: bool = False, log_dir: Path | None = Path("log")
+    debug: bool = False,
+    log_dir: Path | None = Path("log"),
+    console: Console | None = None,
 ) -> logging.Logger:
     logger = logging.getLogger("agripak.data")
     level = logging.DEBUG if debug else logging.INFO
@@ -96,18 +98,17 @@ def configure_logging(
         logger.removeHandler(existing)
         existing.close()
     rich_handler = RichHandler(
-        console=Console(stderr=True),
+        console=console if console is not None else Console(stderr=True),
         rich_tracebacks=debug,
         show_path=debug,
         markup=True,
+        omit_repeated_times=False,
     )
     rich_handler.setLevel(level)
     logger.addHandler(rich_handler)
     if log_dir is not None:
         target_dir = ensure_directory(Path(log_dir))
-        file_handler = logging.FileHandler(
-            target_dir / "agripak.log", encoding="utf-8"
-        )
+        file_handler = logging.FileHandler(target_dir / "agripak.log", encoding="utf-8")
         file_handler.setLevel(level)
         file_handler.setFormatter(
             logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")

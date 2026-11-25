@@ -7,9 +7,9 @@ import time
 import traceback
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
-import pandas as pd
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     Progress,
@@ -21,13 +21,6 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from src.data.analysis import (
-    AnalysisBundle,
-    audit_data_quality,
-    engineer_features,
-    run_full_analysis,
-)
-from src.data.cleaning import CleaningResult, clean_dataset
 from src.data.errors import (
     EXIT_SUCCESS,
     EXIT_UNEXPECTED,
@@ -36,16 +29,16 @@ from src.data.errors import (
     ReportWriteError,
     format_cli_error,
 )
-from src.data.loading import load_dataset, load_raw_text, save_dataframe
-from src.data.plotting import PlotArtifact, generate_all_plots
-from src.data.report import generate_report
-from src.data.schema import infer_schema
-from src.data.utils import (
-    configure_logging,
-    dataframe_to_markdown,
-    ensure_directory,
-    get_console,
-)
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+    from src.data.analysis import AnalysisBundle
+    from src.data.cleaning import CleaningResult
+    from src.data.plotting import PlotArtifact
+
+audit_data_quality: Any = None
+run_full_analysis: Any = None
 
 
 class _CLIArgumentParser(argparse.ArgumentParser):
@@ -104,16 +97,25 @@ def _validate_args(args: argparse.Namespace) -> None:
         )
 
 
+_pending_summary: tuple[str, list[tuple[str, str]]] | None = None
+
+
 def _print_summary(title: str, rows: Sequence[tuple[str, str]]) -> None:
+    global _pending_summary
+    if _active_step is not None:
+        _pending_summary = (title, list(rows))
+        return
     table = Table(title=title, show_header=True, header_style="bold cyan")
     table.add_column("Metric", style="bold")
     table.add_column("Value")
     for key, val in rows:
         table.add_row(key, val)
-    get_console().print(table)
+    Console().print(table)
 
 
 def _write_markdown_file(path: Path, content: str) -> Path:
+    from src.data.utils import ensure_directory
+
     target = Path(path)
     ensure_directory(target.parent)
     try:
@@ -144,6 +146,8 @@ def _step(label: str) -> None:
 def _generate_plots_with_eta(
     clean_df: pd.DataFrame, bundle: AnalysisBundle, assets_dir: Path
 ) -> list[PlotArtifact]:
+    from src.data.plotting import generate_all_plots
+
     return generate_all_plots(
         clean_df,
         bundle,
@@ -155,11 +159,20 @@ def _generate_plots_with_eta(
 def _load_clean_analyze(
     args: argparse.Namespace,
 ) -> tuple[pd.DataFrame, CleaningResult, AnalysisBundle]:
+    from src.data.analysis import run_full_analysis as default_run_full_analysis
+    from src.data.cleaning import clean_dataset
+    from src.data.loading import load_dataset, load_raw_text
+
     _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     raw_text_df = load_raw_text(args.input)
     cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
-    bundle = run_full_analysis(
+    analyzer = (
+        run_full_analysis
+        if run_full_analysis is not None
+        else default_run_full_analysis
+    )
+    bundle = analyzer(
         cleaning_result.data,
         cleaning_result.schema,
         raw_text_df=raw_text_df,
@@ -178,6 +191,8 @@ def _render_report_bundle(
     bundle: AnalysisBundle,
     args: argparse.Namespace,
 ) -> None:
+    from src.data.report import generate_report
+
     plots = _generate_plots_with_eta(cleaning_result.data, bundle, args.assets)
     _step("Writing report...")
     generate_report(
@@ -191,13 +206,23 @@ def _render_report_bundle(
 
 
 def _run_audit(args: argparse.Namespace) -> int:
+    from src.data.analysis import audit_data_quality as default_audit_data_quality
+    from src.data.loading import load_dataset, load_raw_text
+    from src.data.schema import infer_schema
+    from src.data.utils import dataframe_to_markdown
+
     _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     raw_text_df = load_raw_text(args.input)
     _step("Inferring schema...")
     schema = infer_schema(raw_df, target_column=args.target)
     _step("Auditing data quality...")
-    qa = audit_data_quality(raw_df, raw_text_df=raw_text_df)
+    auditor = (
+        audit_data_quality
+        if audit_data_quality is not None
+        else default_audit_data_quality
+    )
+    qa = auditor(raw_df, raw_text_df=raw_text_df)
     lines = [
         "# Data Quality Audit",
         "",
@@ -233,6 +258,9 @@ def _run_audit(args: argparse.Namespace) -> int:
 
 
 def _run_clean(args: argparse.Namespace) -> int:
+    from src.data.cleaning import clean_dataset
+    from src.data.loading import load_dataset, save_dataframe
+
     _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
@@ -270,6 +298,8 @@ def _run_clean(args: argparse.Namespace) -> int:
 
 
 def _run_analyze(args: argparse.Namespace) -> int:
+    from src.data.utils import dataframe_to_markdown
+
     _, _, bundle = _load_clean_analyze(args)
     _step("Writing analysis summary...")
     lines = [
@@ -306,6 +336,10 @@ def _run_analyze(args: argparse.Namespace) -> int:
 
 
 def _run_features(args: argparse.Namespace) -> int:
+    from src.data.analysis import engineer_features
+    from src.data.cleaning import clean_dataset
+    from src.data.loading import load_dataset, save_dataframe
+
     _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
@@ -357,6 +391,8 @@ def _run_report(args: argparse.Namespace) -> int:
 
 
 def _run_full(args: argparse.Namespace) -> int:
+    from src.data.loading import save_dataframe
+
     raw_df, cleaning_result, bundle = _load_clean_analyze(args)
     _step("Saving CSV outputs...")
     clean_csv = save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
@@ -408,17 +444,22 @@ def _print_help(parser: argparse.ArgumentParser, topic: str | None) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    global _active_step
+    global _active_step, _pending_summary
     debug = False
     logger = logging.getLogger("agripak.data")
-    err_console = get_console(stderr=True)
+    err_console = Console(stderr=True)
+    _pending_summary = None
     try:
         parser = build_parser()
         args = parser.parse_args(list(argv) if argv is not None else None)
         if args.command == "help":
             return _print_help(parser, getattr(args, "topic", None))
         debug = bool(getattr(args, "debug", False))
-        logger = configure_logging(debug=debug, log_dir=args.log_dir)
+        from src.data.utils import configure_logging
+
+        logger = configure_logging(
+            debug=debug, log_dir=args.log_dir, console=err_console
+        )
         logger.info("Running command '%s' on input '%s'", args.command, args.input)
         _validate_args(args)
         start = time.perf_counter()
@@ -452,9 +493,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             progress.update(task_id, completed=total_steps)
         elapsed = time.perf_counter() - start
         logger.info("Completed '%s' in %.2fs", args.command, elapsed)
-        get_console().print(
-            f"[bold green]Done[/bold green] in [cyan]{elapsed:.2f}s[/cyan]"
-        )
+        if _pending_summary is not None:
+            summary_title, summary_rows = _pending_summary
+            _pending_summary = None
+            _print_summary(summary_title, summary_rows)
+        Console().print(f"[bold green]Done[/bold green] in [cyan]{elapsed:.2f}s[/cyan]")
         return code
     except DataPipelineError as exc:
         msg = format_cli_error(exc)
