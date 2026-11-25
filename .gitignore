@@ -13,3 +13,39 @@ wheels/
 Tasks
 **.pdf
 **.ipynb_checkpoints/
+
+.agents
+/skills
+
+# Testing and caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Generated CLI scratch outputs
+src/data/cleaned_data.csv
+src/data/engineered_features.csv
+src/data/quality_audit.md
+src/data/cleaning_audit.md
+src/data/analysis_summary.md
+
+# Environment, logs, and temp files
+.env
+.env.*
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
