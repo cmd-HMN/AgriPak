@@ -12,7 +12,9 @@ class DataPipelineError(Exception):
     def __init__(self, message: str, exit_code: int | None = None) -> None:
         cleaned = _clean_message(message)
         self.message: str = cleaned
-        self.exit_code: int = type(self).exit_code if exit_code is None else int(exit_code)
+        self.exit_code: int = (
+            type(self).exit_code if exit_code is None else int(exit_code)
+        )
         super().__init__(cleaned)
 
 
@@ -46,13 +48,41 @@ class ReportWriteError(DataPipelineError):
 
 EXIT_CODE_TABLE: tuple[tuple[int, str, str], ...] = (
     (EXIT_SUCCESS, "EXIT_SUCCESS", "Pipeline completed successfully"),
-    (InvalidArgumentError.exit_code, "InvalidArgumentError", "Invalid CLI or function argument"),
-    (InputNotFoundError.exit_code, "InputNotFoundError", "Input file or directory not found"),
-    (EmptyDataError.exit_code, "EmptyDataError", "Input dataset is empty or has no remaining rows"),
-    (MalformedDataError.exit_code, "MalformedDataError", "Input file is malformed or unsupported"),
-    (MissingColumnError.exit_code, "MissingColumnError", "Required column is missing from dataset"),
-    (AnalysisError.exit_code, "AnalysisError", "Statistical or modeling analysis failed"),
-    (ReportWriteError.exit_code, "ReportWriteError", "Failed to write output or create directory"),
+    (
+        InvalidArgumentError.exit_code,
+        "InvalidArgumentError",
+        "Invalid CLI or function argument",
+    ),
+    (
+        InputNotFoundError.exit_code,
+        "InputNotFoundError",
+        "Input file or directory not found",
+    ),
+    (
+        EmptyDataError.exit_code,
+        "EmptyDataError",
+        "Input dataset is empty or has no remaining rows",
+    ),
+    (
+        MalformedDataError.exit_code,
+        "MalformedDataError",
+        "Input file is malformed or unsupported",
+    ),
+    (
+        MissingColumnError.exit_code,
+        "MissingColumnError",
+        "Required column is missing from dataset",
+    ),
+    (
+        AnalysisError.exit_code,
+        "AnalysisError",
+        "Statistical or modeling analysis failed",
+    ),
+    (
+        ReportWriteError.exit_code,
+        "ReportWriteError",
+        "Failed to write output or create directory",
+    ),
     (EXIT_UNEXPECTED, "EXIT_UNEXPECTED", "Unexpected unhandled error"),
 )
 

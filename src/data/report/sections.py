@@ -1,103 +1,24 @@
 from __future__ import annotations
 
-import os
-from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, cast
 
 import pandas as pd
 
 from src.data.analysis import AnalysisBundle
 from src.data.cleaning import CleaningResult
-from src.data.errors import EXIT_CODE_TABLE, ReportWriteError
+from src.data.errors import EXIT_CODE_TABLE
 from src.data.plotting import PlotArtifact
-from src.data.schema import DatasetSchema
-from src.data.utils import (
-    UNIDENTIFIED,
-    dataframe_to_markdown,
-    ensure_directory,
-    is_identified,
+from src.data.report.formatters import (
+    _append_table,
+    _as_float,
+    _as_int,
+    _fmt_float,
+    _fmt_pct,
+    _render_plot,
+    _schema_attr,
+    _section_intro,
 )
-
-
-def _schema_attr(
-    schema: DatasetSchema, primary: str, alias: str, default: object
-) -> object:
-    if hasattr(schema, primary):
-        return getattr(schema, primary)
-    return getattr(schema, alias) if hasattr(schema, alias) else default
-
-
-def _render_plot(
-    plot_map: dict[str, PlotArtifact],
-    plot_id: str,
-    report_dir: Path,
-    fallback_title: str,
-) -> str:
-    plot = plot_map.get(plot_id)
-    if plot is None:
-        return f"> Plot `{fallback_title}` was not generated."
-    if not plot.generated:
-        return f"> **{plot.title}** skipped: {plot.note or 'no eligible data'}."
-    rel = os.path.relpath(Path(plot.path), Path(report_dir)).replace(os.sep, "/")
-    return f"![{plot.title}]({rel})"
-
-
-def _as_float(value: Any, default: float = 0.0) -> float:
-    return default if value is None or bool(pd.isna(value)) else float(cast(Any, value))
-
-
-def _as_int(value: Any, default: int = 0) -> int:
-    return default if value is None or bool(pd.isna(value)) else int(cast(Any, value))
-
-
-def _fmt_pct(value: Any, digits: int = 1) -> str:
-    return (
-        UNIDENTIFIED
-        if value is None or bool(pd.isna(value))
-        else f"{_as_float(value) * 100:.{digits}f}%"
-    )
-
-
-def _fmt_float(value: Any, digits: int = 3) -> str:
-    return (
-        UNIDENTIFIED
-        if value is None or bool(pd.isna(value))
-        else f"{_as_float(value):.{digits}f}"
-    )
-
-
-def _append_table(
-    lines: list[str],
-    df: pd.DataFrame,
-    float_digits: int = 3,
-    include_index: bool = False,
-    heading: str = "",
-) -> None:
-    if df.empty:
-        return
-    if heading:
-        lines.extend([heading, ""])
-    lines.extend(
-        [
-            dataframe_to_markdown(
-                df, float_digits=float_digits, include_index=include_index
-            ),
-            "",
-        ]
-    )
-
-
-def _section_intro(
-    heading: str,
-    plots: Sequence[tuple[str, str]],
-    plot_map: dict[str, PlotArtifact],
-    report_dir: Path,
-) -> list[str]:
-    lines = [heading, ""]
-    for plot_id, fallback in plots:
-        lines.extend([_render_plot(plot_map, plot_id, report_dir, fallback), ""])
-    return lines
+from src.data.utils import UNIDENTIFIED, dataframe_to_markdown, is_identified
 
 
 def _build_section_1(
@@ -109,6 +30,12 @@ def _build_section_1(
 ) -> list[str]:
     schema = analysis.schema
     target = str(_schema_attr(schema, "target_column", "target_col", UNIDENTIFIED))
+    target_kind = str(getattr(schema, "target_kind", UNIDENTIFIED))
+    primary = str(getattr(schema, "primary_driver", UNIDENTIFIED))
+    secondary = str(getattr(schema, "secondary_driver", UNIDENTIFIED))
+    subgroup = str(
+        _schema_attr(schema, "primary_subgroup", "subgroup_col", UNIDENTIFIED)
+    )
     lines = [
         "## 1. Dataset Overview & Target Balance",
         "",
@@ -117,10 +44,10 @@ def _build_section_1(
         f"- **Dimensions:** `{analysis.row_count:,}` rows x `{analysis.col_count}` columns (raw input `{len(raw_df):,}` x `{len(raw_df.columns)}`)",
         f"- **Minimum subgroup threshold (`min_n`):** `{analysis.min_n}`",
         f"- **Baseline positive rate:** `{_fmt_pct(analysis.base_rate)}`",
-        f"- **Target column:** `{target}` (`{getattr(schema, 'target_kind', UNIDENTIFIED)}`)",
-        f"- **Primary driver:** `{getattr(schema, 'primary_driver', UNIDENTIFIED)}`",
-        f"- **Secondary driver:** `{getattr(schema, 'secondary_driver', UNIDENTIFIED)}`",
-        f"- **Primary subgroup:** `{_schema_attr(schema, 'primary_subgroup', 'subgroup_col', UNIDENTIFIED)}`",
+        f"- **Target column:** `{target}` (`{target_kind}`)",
+        f"- **Primary driver:** `{primary}`",
+        f"- **Secondary driver:** `{secondary}`",
+        f"- **Primary subgroup:** `{subgroup}`",
         "",
         "### 1.1 Schema & Column Profiles",
         "",
@@ -143,7 +70,6 @@ def _build_section_1(
         _append_table(lines, profile_df, float_digits=2)
     else:
         lines.extend([f"Column profiles: {UNIDENTIFIED}.", ""])
-
     lines.extend(["### 1.2 Numeric Summary & Target Distribution", ""])
     if not analysis.numeric_describe.empty:
         _append_table(
@@ -151,7 +77,6 @@ def _build_section_1(
         )
     else:
         lines.extend(["No numeric columns detected for summary statistics.", ""])
-
     lines.extend(
         [
             _render_plot(
@@ -179,11 +104,7 @@ def _build_section_1(
     return lines
 
 
-def _build_section_2_quality_and_univariate(
-    analysis: AnalysisBundle,
-    plot_map: dict[str, PlotArtifact],
-    report_dir: Path,
-) -> list[str]:
+def _build_section_2_1(analysis: AnalysisBundle) -> list[str]:
     qa = analysis.quality_audit
     total_missing = (
         _as_int(qa.column_summary["missing_count"].sum())
@@ -205,7 +126,6 @@ def _build_section_2_quality_and_univariate(
         if not qa.text_hygiene.empty
         else 0
     )
-
     lines = ["### 2.1 Nulls, Cardinality, Exact Duplicates & Text Hygiene", ""]
     _append_table(lines, qa.column_summary, float_digits=3)
     _append_table(lines, qa.text_hygiene, float_digits=0)
@@ -217,14 +137,19 @@ def _build_section_2_quality_and_univariate(
             "",
         ]
     )
+    return lines
 
-    lines.extend(
-        _section_intro(
-            "### 2.2 Numeric Distributions & Shape Metrics",
-            [("numeric_distributions", "Numeric distributions")],
-            plot_map,
-            report_dir,
-        )
+
+def _build_section_2_2_and_2_3(
+    analysis: AnalysisBundle,
+    plot_map: dict[str, PlotArtifact],
+    report_dir: Path,
+) -> list[str]:
+    lines = _section_intro(
+        "### 2.2 Numeric Distributions & Shape Metrics",
+        [("numeric_distributions", "Numeric distributions")],
+        plot_map,
+        report_dir,
     )
     if not analysis.numeric_shape.empty:
         _append_table(lines, analysis.numeric_shape, float_digits=3)
@@ -238,7 +163,6 @@ def _build_section_2_quality_and_univariate(
     else:
         lines.append("No numeric columns available for shape diagnostics.")
     lines.append("")
-
     lines.extend(
         _section_intro(
             "### 2.3 Categorical & Binary Feature Distributions",
@@ -266,7 +190,7 @@ def _build_section_2_quality_and_univariate(
     return lines
 
 
-def _build_section_2_bivariate(
+def _build_section_2_4_and_2_5(
     analysis: AnalysisBundle,
     plot_map: dict[str, PlotArtifact],
     report_dir: Path,
@@ -294,7 +218,6 @@ def _build_section_2_bivariate(
     else:
         lines.append(f"Target rates by group: `{UNIDENTIFIED}`.")
     lines.append("")
-
     lines.extend(
         _section_intro(
             "### 2.5 Numeric Distributions by Target Class & Mann-Whitney U Tests",
@@ -317,17 +240,22 @@ def _build_section_2_bivariate(
     else:
         lines.append(f"Mann-Whitney U results: `{UNIDENTIFIED}`.")
     lines.append("")
+    return lines
 
-    lines.extend(
-        _section_intro(
-            "### 2.6 Spearman Correlation & Decile Target Curves",
-            [
-                ("spearman_correlation", "Spearman correlation"),
-                ("decile_risk_curves", "Decile risk curves"),
-            ],
-            plot_map,
-            report_dir,
-        )
+
+def _build_section_2_6_and_2_7(
+    analysis: AnalysisBundle,
+    plot_map: dict[str, PlotArtifact],
+    report_dir: Path,
+) -> list[str]:
+    lines = _section_intro(
+        "### 2.6 Spearman Correlation & Decile Target Curves",
+        [
+            ("spearman_correlation", "Spearman correlation"),
+            ("decile_risk_curves", "Decile risk curves"),
+        ],
+        plot_map,
+        report_dir,
     )
     if not analysis.ranked_target_spearman.empty:
         _append_table(lines, analysis.ranked_target_spearman, float_digits=4)
@@ -351,23 +279,17 @@ def _build_section_2_bivariate(
     else:
         lines.append(f"Spearman target ranking: `{UNIDENTIFIED}`.")
     lines.append("")
-    return lines
-
-
-def _build_section_2_interactions_and_tests(
-    analysis: AnalysisBundle,
-    plot_map: dict[str, PlotArtifact],
-    report_dir: Path,
-) -> list[str]:
     combos = analysis.combinations
-    lines = _section_intro(
-        "### 2.7 Pairwise Interactions & Condition Combinations",
-        [
-            ("pairwise_risk_heatmaps", "Pairwise risk heatmaps"),
-            ("top_combinations", "Top combinations"),
-        ],
-        plot_map,
-        report_dir,
+    lines.extend(
+        _section_intro(
+            "### 2.7 Pairwise Interactions & Condition Combinations",
+            [
+                ("pairwise_risk_heatmaps", "Pairwise risk heatmaps"),
+                ("top_combinations", "Top combinations"),
+            ],
+            plot_map,
+            report_dir,
+        )
     )
     lines.extend(
         [
@@ -400,18 +322,23 @@ def _build_section_2_interactions_and_tests(
             "",
         ]
     )
+    return lines
 
+
+def _build_section_2_8_and_2_9(
+    analysis: AnalysisBundle,
+    plot_map: dict[str, PlotArtifact],
+    report_dir: Path,
+) -> list[str]:
     schema = analysis.schema
-    lines.extend(
-        _section_intro(
-            "### 2.8 Continuous x Binary Interactions & Subgroup Stability",
-            [
-                ("continuous_binary_interactions", "Continuous binary interactions"),
-                ("subgroup_risk_surfaces", "Subgroup risk surfaces"),
-            ],
-            plot_map,
-            report_dir,
-        )
+    lines = _section_intro(
+        "### 2.8 Continuous x Binary Interactions & Subgroup Stability",
+        [
+            ("continuous_binary_interactions", "Continuous binary interactions"),
+            ("subgroup_risk_surfaces", "Subgroup risk surfaces"),
+        ],
+        plot_map,
+        report_dir,
     )
     lines.extend(
         [
@@ -426,7 +353,6 @@ def _build_section_2_interactions_and_tests(
     else:
         lines.append(f"- Subgroup risk surfaces: `{UNIDENTIFIED}`.")
     lines.append("")
-
     lines.extend(
         _section_intro(
             "### 2.9 Kruskal-Wallis Group Tests & Cramer's V Associations",
@@ -560,120 +486,3 @@ def _build_section_6() -> list[str]:
         "```",
         "",
     ]
-
-
-def _build_header(
-    raw_df: pd.DataFrame,
-    cleaning_result: CleaningResult,
-    analysis: AnalysisBundle,
-    plots: Sequence[PlotArtifact],
-    input_path: Path,
-) -> list[str]:
-    target = str(
-        _schema_attr(analysis.schema, "target_column", "target_col", UNIDENTIFIED)
-    )
-    generated_plots = sum(1 for plot in plots if plot.generated)
-    base_rate = _fmt_pct(analysis.base_rate)
-    return [
-        '<div align="center">',
-        "",
-        "# AgriPak Data Analysis Report",
-        "",
-        "**Dynamically generated exploratory audit, cleaning log, leakage check, and feature-engineering report.**",
-        "",
-        f"![Rows](https://img.shields.io/badge/rows-{analysis.row_count:,}-blue)",
-        f"![Columns](https://img.shields.io/badge/columns-{analysis.col_count}-blue)",
-        f"![Plots](https://img.shields.io/badge/plots-{generated_plots}%2F{len(plots)}-brightgreen)",
-        f"![Target](https://img.shields.io/badge/target-{target}-orange)",
-        f"![Baseline](https://img.shields.io/badge/baseline-{base_rate.replace('%', '%25')}-informational)",
-        "",
-        "**[1. Overview](#1-dataset-overview--target-balance)** |",
-        "**[2. Statistical Audit](#2-data-quality--exploratory-statistical-audit)** |",
-        "**[3. Cleaning](#3-data-cleaning-audit)** |",
-        "**[4. Leakage Check](#4-leakage-sanity-check)** |",
-        "**[5. Feature Engineering](#5-feature-engineering--model-validation)** |",
-        "**[6. Exit Codes & Reproducibility](#6-cli-exit-codes--reproducibility)** |",
-        "**[Project README](../../README.md)**",
-        "",
-        "</div>",
-        "",
-        "---",
-        "",
-        f"This report is dynamically generated from `{input_path.as_posix()}` and provides two high-level deliverables:",
-        "",
-        "- Complete exploratory and statistical audit covering distributions, non-parametric tests, correlations, interactions, and independence checks.",
-        "- Reproducible cleaning audit, single-feature leakage verification, plot-driven feature engineering, and cross-validated model benchmarks.",
-        "",
-        "| Metric | Value |",
-        "| --- | --- |",
-        f"| Raw input shape | `{len(raw_df):,}` rows x `{len(raw_df.columns)}` cols |",
-        f"| Cleaned shape | `{cleaning_result.rows_after:,}` rows x `{analysis.col_count}` cols |",
-        f"| Memory footprint | `{cleaning_result.memory_mb_before:.2f} MB` -> `{cleaning_result.memory_mb_after:.2f} MB` |",
-        f"| Inferred target | `{target}` (`{base_rate}` baseline) |",
-        f"| Generated charts | `{generated_plots}` / `{len(plots)}` |",
-        "",
-        "---",
-        "",
-    ]
-
-
-def build_report_markdown(
-    raw_df: pd.DataFrame,
-    cleaning_result: CleaningResult,
-    analysis: AnalysisBundle,
-    plots: Sequence[PlotArtifact],
-    input_path: Path,
-    report_path: Path,
-) -> str:
-    report_dir = Path(report_path).parent
-    plot_map = {plot.plot_id: plot for plot in plots}
-    sections: list[str] = [
-        *_build_header(raw_df, cleaning_result, analysis, plots, Path(input_path)),
-        *_build_section_1(raw_df, analysis, plot_map, report_dir, Path(input_path)),
-        "---",
-        "",
-        "## 2. Data Quality & Exploratory Statistical Audit",
-        "",
-        *_build_section_2_quality_and_univariate(analysis, plot_map, report_dir),
-        *_build_section_2_bivariate(analysis, plot_map, report_dir),
-        *_build_section_2_interactions_and_tests(analysis, plot_map, report_dir),
-        "---",
-        "",
-        *_build_section_3(cleaning_result),
-        "---",
-        "",
-        *_build_section_4(analysis),
-        "---",
-        "",
-        *_build_section_5(analysis, plot_map, report_dir),
-        "---",
-        "",
-        *_build_section_6(),
-        "---",
-        "",
-        "## License",
-        "",
-        "AgriPak is MIT-licensed, as found in the [LICENSE](../../LICENSE) file.",
-        "",
-    ]
-    return "\n".join(sections).rstrip() + "\n"
-
-
-def generate_report(
-    raw_df: pd.DataFrame,
-    cleaning_result: CleaningResult,
-    analysis: AnalysisBundle,
-    plots: Sequence[PlotArtifact],
-    input_path: Path,
-    report_path: Path,
-) -> Path:
-    target = Path(report_path)
-    ensure_directory(target.parent)
-    markdown = build_report_markdown(
-        raw_df, cleaning_result, analysis, plots, input_path, target
-    )
-    try:
-        target.write_text(markdown, encoding="utf-8")
-    except OSError as exc:
-        raise ReportWriteError(f"Failed to write report to '{target}': {exc}") from exc
-    return target

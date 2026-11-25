@@ -9,7 +9,12 @@ from typing import NoReturn
 
 import pandas as pd
 
-from src.data.analysis import AnalysisBundle, audit_data_quality, engineer_features, run_full_analysis
+from src.data.analysis import (
+    AnalysisBundle,
+    audit_data_quality,
+    engineer_features,
+    run_full_analysis,
+)
 from src.data.cleaning import CleaningResult, clean_dataset
 from src.data.errors import (
     EXIT_SUCCESS,
@@ -57,7 +62,9 @@ def _validate_args(args: argparse.Namespace) -> None:
     if args.min_n is not None and args.min_n < 1:
         raise InvalidArgumentError(f"--min-n must be >= 1, got {args.min_n}")
     if not (0.0 < args.leak_threshold <= 1.0):
-        raise InvalidArgumentError(f"--leak-threshold must be in (0, 1], got {args.leak_threshold}")
+        raise InvalidArgumentError(
+            f"--leak-threshold must be in (0, 1], got {args.leak_threshold}"
+        )
 
 
 def _write_markdown_file(path: Path, content: str) -> Path:
@@ -70,7 +77,9 @@ def _write_markdown_file(path: Path, content: str) -> Path:
     return target
 
 
-def _load_clean_analyze(args: argparse.Namespace) -> tuple[pd.DataFrame, CleaningResult, AnalysisBundle]:
+def _load_clean_analyze(
+    args: argparse.Namespace,
+) -> tuple[pd.DataFrame, CleaningResult, AnalysisBundle]:
     raw_df = load_dataset(args.input)
     raw_text_df = load_raw_text(args.input)
     cleaning_result = clean_dataset(raw_df, target_column=args.target)
@@ -195,7 +204,9 @@ def _run_report(args: argparse.Namespace) -> int:
 def _run_full(args: argparse.Namespace) -> int:
     raw_df, cleaning_result, bundle = _load_clean_analyze(args)
     save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
-    save_dataframe(bundle.feature_engineering.data, args.output / "engineered_features.csv")
+    save_dataframe(
+        bundle.feature_engineering.data, args.output / "engineered_features.csv"
+    )
     _render_report_bundle(raw_df, cleaning_result, bundle, args)
     return EXIT_SUCCESS
 
@@ -232,5 +243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:
         if debug:
             traceback.print_exc(file=sys.stderr)
-        print(f"Unexpected error: {exc} (run with --debug for traceback)", file=sys.stderr)
+        print(
+            f"Unexpected error: {exc} (run with --debug for traceback)", file=sys.stderr
+        )
         return EXIT_UNEXPECTED

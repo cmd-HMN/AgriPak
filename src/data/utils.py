@@ -158,7 +158,9 @@ def dataframe_to_markdown(
         "| " + " | ".join("---" for _ in headers) + " |",
     ]
     for idx_val, row in view.iterrows():
-        cells: list[str] = [_format_cell(idx_val, float_digits)] if include_index else []
+        cells: list[str] = (
+            [_format_cell(idx_val, float_digits)] if include_index else []
+        )
         cells.extend(_format_cell(val, float_digits) for val in row.tolist())
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)

@@ -19,7 +19,9 @@ def _validate_non_empty_file(file_path: Path) -> None:
     try:
         size = file_path.stat().st_size
     except OSError as exc:
-        raise InputNotFoundError(f"Cannot access input file '{file_path}': {exc}") from exc
+        raise InputNotFoundError(
+            f"Cannot access input file '{file_path}': {exc}"
+        ) from exc
     if size == 0:
         raise EmptyDataError(f"Input file is empty (0 bytes): '{file_path}'")
 
@@ -32,11 +34,15 @@ def _read_single_file(file_path: Path, encoding: str, raw_text: bool) -> pd.Data
             sep = "\t" if ext == ".tsv" else ","
             kwargs: dict[str, Any] = {"sep": sep, "encoding": encoding}
             if raw_text:
-                kwargs.update({"dtype": str, "keep_default_na": False, "na_filter": False})
+                kwargs.update(
+                    {"dtype": str, "keep_default_na": False, "na_filter": False}
+                )
             df = pd.read_csv(file_path, **kwargs)
         elif ext == ".json":
             if raw_text:
-                df = pd.read_json(file_path, encoding=encoding, dtype=cast(Any, False)).astype(str)
+                df = pd.read_json(
+                    file_path, encoding=encoding, dtype=cast(Any, False)
+                ).astype(str)
             else:
                 df = pd.read_json(file_path, encoding=encoding)
         elif ext == ".parquet":
@@ -44,7 +50,9 @@ def _read_single_file(file_path: Path, encoding: str, raw_text: bool) -> pd.Data
             if raw_text:
                 df = df.astype(str)
         else:
-            raise MalformedDataError(f"Unsupported file extension '{ext}' for '{file_path}'")
+            raise MalformedDataError(
+                f"Unsupported file extension '{ext}' for '{file_path}'"
+            )
     except (EmptyDataError, MalformedDataError):
         raise
     except pd.errors.EmptyDataError as exc:
@@ -59,7 +67,9 @@ def _read_single_file(file_path: Path, encoding: str, raw_text: bool) -> pd.Data
 
 def _load_frames(input_path: Path, encoding: str, raw_text: bool) -> pd.DataFrame:
     files = resolve_input_files(Path(input_path))
-    frames = [_read_single_file(fp, encoding=encoding, raw_text=raw_text) for fp in files]
+    frames = [
+        _read_single_file(fp, encoding=encoding, raw_text=raw_text) for fp in files
+    ]
     combined = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
     if combined.empty or len(combined.columns) == 0:
         raise EmptyDataError(f"Combined dataset from '{input_path}' is empty")
@@ -78,9 +88,15 @@ def resolve_input_files(input_path: Path) -> list[Path]:
             )
         return [path]
     if path.is_dir():
-        files = sorted(p for p in path.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS)
+        files = sorted(
+            p
+            for p in path.iterdir()
+            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+        )
         if not files:
-            raise InputNotFoundError(f"No supported data files found in directory: '{path}'")
+            raise InputNotFoundError(
+                f"No supported data files found in directory: '{path}'"
+            )
         return files
     raise InputNotFoundError(f"Input path is neither a file nor a directory: '{path}'")
 
@@ -111,5 +127,7 @@ def save_dataframe(df: pd.DataFrame, output_path: Path) -> Path:
         elif ext == ".parquet":
             df.to_parquet(target, index=False)
     except OSError as exc:
-        raise ReportWriteError(f"Failed to write DataFrame to '{target}': {exc}") from exc
+        raise ReportWriteError(
+            f"Failed to write DataFrame to '{target}': {exc}"
+        ) from exc
     return target
