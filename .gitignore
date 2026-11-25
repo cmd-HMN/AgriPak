@@ -12,3 +12,4 @@ wheels/
 # Tasks
 Tasks
 **.pdf
+**.ipynb_checkpoints/
