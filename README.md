@@ -41,7 +41,7 @@ AgriPak is a Python package that provides two high-level features:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install pandas numpy scipy scikit-learn matplotlib seaborn pytest
+pip install pandas numpy scipy scikit-learn matplotlib seaborn rich pytest
 ```
 
 ### Using `uv`

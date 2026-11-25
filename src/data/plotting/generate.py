@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -31,40 +32,30 @@ def generate_all_plots(
     clean_df: pd.DataFrame,
     analysis: AnalysisBundle,
     assets_dir: Path,
+    on_plot: Callable[[str], None] | None = None,
 ) -> list[PlotArtifact]:
     schema = analysis.schema
     base_rate = analysis.base_rate
-    return [
-        plot_target_distribution(clean_df, schema, assets_dir),
-        plot_numeric_distributions(clean_df, schema, assets_dir),
-        plot_categorical_counts(clean_df, schema, assets_dir),
-        plot_binary_flag_counts(clean_df, schema, assets_dir),
-        plot_risk_rate_by_category(clean_df, schema, base_rate, assets_dir),
-        plot_numeric_by_target(clean_df, schema, assets_dir),
-        plot_spearman_correlation(analysis.spearman_matrix, assets_dir),
-        plot_decile_risk_curves(
-            analysis.decile_curves, base_rate, schema.target_column, assets_dir
-        ),
-        plot_pairwise_risk_heatmaps(
-            clean_df, schema, base_rate, analysis.min_n, assets_dir
-        ),
-        plot_top_combinations(
-            analysis.combinations, base_rate, schema.target_column, assets_dir
-        ),
-        plot_continuous_binary_interactions(clean_df, schema, base_rate, assets_dir),
-        plot_subgroup_risk_surfaces(
-            analysis.subgroup_surfaces, schema, base_rate, assets_dir
-        ),
-        plot_kruskal_wallis_boxplots(
-            clean_df, schema, analysis.kruskal_wallis, assets_dir
-        ),
-        plot_cramers_v_associations(
-            analysis.target_cramers_v,
-            analysis.pairwise_cramers_v,
-            schema.target_column,
-            assets_dir,
-        ),
-        plot_engineered_features(
-            analysis.feature_engineering, schema, base_rate, assets_dir
-        ),
+    jobs: list[tuple[str, Callable[[], PlotArtifact]]] = [
+        ("target_distribution", lambda: plot_target_distribution(clean_df, schema, assets_dir)),
+        ("numeric_distributions", lambda: plot_numeric_distributions(clean_df, schema, assets_dir)),
+        ("categorical_counts", lambda: plot_categorical_counts(clean_df, schema, assets_dir)),
+        ("binary_flag_counts", lambda: plot_binary_flag_counts(clean_df, schema, assets_dir)),
+        ("risk_rate_by_category", lambda: plot_risk_rate_by_category(clean_df, schema, base_rate, assets_dir)),
+        ("numeric_by_target", lambda: plot_numeric_by_target(clean_df, schema, assets_dir)),
+        ("spearman_correlation", lambda: plot_spearman_correlation(analysis.spearman_matrix, assets_dir)),
+        ("decile_risk_curves", lambda: plot_decile_risk_curves(analysis.decile_curves, base_rate, schema.target_column, assets_dir)),
+        ("pairwise_risk_heatmaps", lambda: plot_pairwise_risk_heatmaps(clean_df, schema, base_rate, analysis.min_n, assets_dir)),
+        ("top_combinations", lambda: plot_top_combinations(analysis.combinations, base_rate, schema.target_column, assets_dir)),
+        ("continuous_binary_interactions", lambda: plot_continuous_binary_interactions(clean_df, schema, base_rate, assets_dir)),
+        ("subgroup_risk_surfaces", lambda: plot_subgroup_risk_surfaces(analysis.subgroup_surfaces, schema, base_rate, assets_dir)),
+        ("kruskal_wallis_boxplots", lambda: plot_kruskal_wallis_boxplots(clean_df, schema, analysis.kruskal_wallis, assets_dir)),
+        ("cramers_v_associations", lambda: plot_cramers_v_associations(analysis.target_cramers_v, analysis.pairwise_cramers_v, schema.target_column, assets_dir)),
+        ("engineered_features", lambda: plot_engineered_features(analysis.feature_engineering, schema, base_rate, assets_dir)),
     ]
+    artifacts: list[PlotArtifact] = []
+    for name, fn in jobs:
+        artifacts.append(fn())
+        if on_plot is not None:
+            on_plot(name)
+    return artifacts

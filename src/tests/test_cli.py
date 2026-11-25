@@ -23,6 +23,8 @@ from src.data.errors import (
         ["features", "--help"],
         ["plot", "--help"],
         ["report", "--help"],
+        ["help"],
+        ["help", "audit"],
     ],
 )
 def test_cli_help_flags(argv: list[str]) -> None:

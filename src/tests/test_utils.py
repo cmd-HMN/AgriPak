@@ -8,8 +8,10 @@ from src.data.errors import ReportWriteError
 from src.data.utils import (
     UNIDENTIFIED,
     compute_min_subgroup_size,
+    configure_logging,
     dataframe_to_markdown,
     ensure_directory,
+    get_console,
     is_identified,
     normalize_label,
 )
@@ -70,3 +72,15 @@ def test_ensure_directory_creates_and_raises_on_file_conflict(tmp_path: Path) ->
     blocking_file.write_text("x", encoding="utf-8")
     with pytest.raises(ReportWriteError):
         ensure_directory(blocking_file / "sub")
+
+
+def test_configure_logging_writes_log_file_and_console(tmp_path: Path) -> None:
+    log_dir = tmp_path / "log"
+    logger = configure_logging(debug=True, log_dir=log_dir)
+    logger.info("rich logging smoke test")
+    for handler in logger.handlers:
+        handler.flush()
+    log_file = log_dir / "agripak.log"
+    assert log_file.exists()
+    assert "rich logging smoke test" in log_file.read_text(encoding="utf-8")
+    assert get_console(stderr=True).stderr is True

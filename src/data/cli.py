@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
+import time
 import traceback
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import NoReturn
 
 import pandas as pd
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.table import Table
 
 from src.data.analysis import (
     AnalysisBundle,
@@ -25,10 +37,15 @@ from src.data.errors import (
     format_cli_error,
 )
 from src.data.loading import load_dataset, load_raw_text, save_dataframe
-from src.data.plotting import generate_all_plots
+from src.data.plotting import PlotArtifact, generate_all_plots
 from src.data.report import generate_report
 from src.data.schema import infer_schema
-from src.data.utils import configure_logging, dataframe_to_markdown, ensure_directory
+from src.data.utils import (
+    configure_logging,
+    dataframe_to_markdown,
+    ensure_directory,
+    get_console,
+)
 
 
 class _CLIArgumentParser(argparse.ArgumentParser):
@@ -40,6 +57,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--input", type=Path, default=Path("data/raw"))
     parser.add_argument("--output", type=Path, default=Path("src/data"))
     parser.add_argument("--assets", type=Path, default=Path("src/assets"))
+    parser.add_argument("--log-dir", type=Path, default=Path("log"))
     parser.add_argument("--target", type=str, default=None)
     parser.add_argument("--min-n", type=int, default=None)
     parser.add_argument("--n-splits", type=int, default=5)
@@ -48,11 +66,30 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--debug", action="store_true")
 
 
+_COMMAND_HELP: tuple[tuple[str, str], ...] = (
+    ("run", "Run full pipeline (clean, analyze, features, plots, report)"),
+    ("audit", "Infer schema and run data quality and text-hygiene audit"),
+    ("clean", "Run 5-step cleaning pipeline and save cleaned CSV + audit"),
+    ("analyze", "Run statistical EDA, leakage check, and CV benchmarks"),
+    ("features", "Engineer plot-driven features and export CSV"),
+    ("plot", "Generate all 15 exploratory and engineered PNG charts"),
+    ("report", "Generate plots and write src/data/README.md"),
+    ("help", "Show available commands or help for a specific command"),
+)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = _CLIArgumentParser(prog="src.data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for name in ("run", "audit", "clean", "analyze", "features", "plot", "report"):
         _add_common_arguments(subparsers.add_parser(name))
+    help_parser = subparsers.add_parser("help")
+    help_parser.add_argument(
+        "topic",
+        nargs="?",
+        choices=("run", "audit", "clean", "analyze", "features", "plot", "report"),
+        default=None,
+    )
     return parser
 
 
@@ -67,6 +104,15 @@ def _validate_args(args: argparse.Namespace) -> None:
         )
 
 
+def _print_summary(title: str, rows: Sequence[tuple[str, str]]) -> None:
+    table = Table(title=title, show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+    for key, val in rows:
+        table.add_row(key, val)
+    get_console().print(table)
+
+
 def _write_markdown_file(path: Path, content: str) -> Path:
     target = Path(path)
     ensure_directory(target.parent)
@@ -77,12 +123,42 @@ def _write_markdown_file(path: Path, content: str) -> Path:
     return target
 
 
+_COMMAND_STEPS: dict[str, int] = {
+    "audit": 4,
+    "clean": 7,
+    "features": 8,
+    "analyze": 19,
+    "plot": 33,
+    "report": 34,
+    "run": 35,
+}
+
+_active_step: Callable[[str], None] | None = None
+
+
+def _step(label: str) -> None:
+    if _active_step is not None:
+        _active_step(label)
+
+
+def _generate_plots_with_eta(
+    clean_df: pd.DataFrame, bundle: AnalysisBundle, assets_dir: Path
+) -> list[PlotArtifact]:
+    return generate_all_plots(
+        clean_df,
+        bundle,
+        assets_dir,
+        on_plot=lambda name: _step(f"Plotting {name}..."),
+    )
+
+
 def _load_clean_analyze(
     args: argparse.Namespace,
 ) -> tuple[pd.DataFrame, CleaningResult, AnalysisBundle]:
+    _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     raw_text_df = load_raw_text(args.input)
-    cleaning_result = clean_dataset(raw_df, target_column=args.target)
+    cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
     bundle = run_full_analysis(
         cleaning_result.data,
         cleaning_result.schema,
@@ -91,6 +167,7 @@ def _load_clean_analyze(
         leak_threshold=args.leak_threshold,
         n_splits=args.n_splits,
         random_state=args.seed,
+        on_step=_step,
     )
     return raw_df, cleaning_result, bundle
 
@@ -101,7 +178,8 @@ def _render_report_bundle(
     bundle: AnalysisBundle,
     args: argparse.Namespace,
 ) -> None:
-    plots = generate_all_plots(cleaning_result.data, bundle, args.assets)
+    plots = _generate_plots_with_eta(cleaning_result.data, bundle, args.assets)
+    _step("Writing report...")
     generate_report(
         raw_df=raw_df,
         cleaning_result=cleaning_result,
@@ -113,9 +191,12 @@ def _render_report_bundle(
 
 
 def _run_audit(args: argparse.Namespace) -> int:
+    _step("Loading dataset...")
     raw_df = load_dataset(args.input)
     raw_text_df = load_raw_text(args.input)
+    _step("Inferring schema...")
     schema = infer_schema(raw_df, target_column=args.target)
+    _step("Auditing data quality...")
     qa = audit_data_quality(raw_df, raw_text_df=raw_text_df)
     lines = [
         "# Data Quality Audit",
@@ -135,14 +216,28 @@ def _run_audit(args: argparse.Namespace) -> int:
         dataframe_to_markdown(qa.text_hygiene, float_digits=0),
         "",
     ]
-    _write_markdown_file(args.output / "quality_audit.md", "\n".join(lines))
+    _step("Writing quality audit...")
+    out_path = _write_markdown_file(args.output / "quality_audit.md", "\n".join(lines))
+    logging.getLogger("agripak.data").info("Wrote quality audit to %s", out_path)
+    _print_summary(
+        "Data Quality Audit",
+        [
+            ("Rows", f"{len(raw_df):,}"),
+            ("Columns", str(len(raw_df.columns))),
+            ("Duplicates", str(qa.duplicate_count)),
+            ("Inferred target", schema.target_column),
+            ("Output", str(out_path)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_clean(args: argparse.Namespace) -> int:
+    _step("Loading dataset...")
     raw_df = load_dataset(args.input)
-    cleaning_result = clean_dataset(raw_df, target_column=args.target)
-    save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
+    cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
+    _step("Saving cleaned outputs...")
+    csv_path = save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
     lines = [
         "# Data Cleaning Audit",
         "",
@@ -154,12 +249,29 @@ def _run_clean(args: argparse.Namespace) -> int:
         cleaning_result.audit.to_markdown(),
         "",
     ]
-    _write_markdown_file(args.output / "cleaning_audit.md", "\n".join(lines))
+    md_path = _write_markdown_file(args.output / "cleaning_audit.md", "\n".join(lines))
+    logging.getLogger("agripak.data").info("Wrote cleaned data to %s", csv_path)
+    _print_summary(
+        "Data Cleaning",
+        [
+            (
+                "Rows",
+                f"{cleaning_result.rows_before:,} -> {cleaning_result.rows_after:,}",
+            ),
+            (
+                "Memory",
+                f"{cleaning_result.memory_mb_before:.2f} MB -> {cleaning_result.memory_mb_after:.2f} MB",
+            ),
+            ("Cleaned CSV", str(csv_path)),
+            ("Audit", str(md_path)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_analyze(args: argparse.Namespace) -> int:
     _, _, bundle = _load_clean_analyze(args)
+    _step("Writing analysis summary...")
     lines = [
         "# Analysis Summary",
         "",
@@ -177,37 +289,94 @@ def _run_analyze(args: argparse.Namespace) -> int:
         dataframe_to_markdown(bundle.cv_auc_table, float_digits=4),
         "",
     ]
-    _write_markdown_file(args.output / "analysis_summary.md", "\n".join(lines))
+    out_path = _write_markdown_file(
+        args.output / "analysis_summary.md", "\n".join(lines)
+    )
+    logging.getLogger("agripak.data").info("Wrote analysis summary to %s", out_path)
+    _print_summary(
+        "Statistical Analysis",
+        [
+            ("Rows", f"{bundle.row_count:,}"),
+            ("Target", bundle.schema.target_column),
+            ("Leakage flags", str(len(bundle.flagged_leakage_columns))),
+            ("Output", str(out_path)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_features(args: argparse.Namespace) -> int:
+    _step("Loading dataset...")
     raw_df = load_dataset(args.input)
-    cleaning_result = clean_dataset(raw_df, target_column=args.target)
+    cleaning_result = clean_dataset(raw_df, target_column=args.target, on_step=_step)
+    _step("Engineering features...")
     fe_result = engineer_features(cleaning_result.data, cleaning_result.schema)
-    save_dataframe(fe_result.data, args.output / "engineered_features.csv")
+    _step("Saving engineered features...")
+    out_path = save_dataframe(fe_result.data, args.output / "engineered_features.csv")
+    logging.getLogger("agripak.data").info("Wrote engineered features to %s", out_path)
+    _print_summary(
+        "Feature Engineering",
+        [
+            ("Engineered columns", str(len(fe_result.engineered_columns))),
+            ("Output", str(out_path)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_plot(args: argparse.Namespace) -> int:
     _, cleaning_result, bundle = _load_clean_analyze(args)
-    generate_all_plots(cleaning_result.data, bundle, args.assets)
+    plots = _generate_plots_with_eta(cleaning_result.data, bundle, args.assets)
+    generated = sum(1 for p in plots if p.generated)
+    logging.getLogger("agripak.data").info(
+        "Generated %d/%d plots in %s", generated, len(plots), args.assets
+    )
+    _print_summary(
+        "Plot Generation",
+        [
+            ("Plots generated", f"{generated}/{len(plots)}"),
+            ("Assets directory", str(args.assets)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_report(args: argparse.Namespace) -> int:
     raw_df, cleaning_result, bundle = _load_clean_analyze(args)
     _render_report_bundle(raw_df, cleaning_result, bundle, args)
+    report_path = args.output / "README.md"
+    logging.getLogger("agripak.data").info("Generated report at %s", report_path)
+    _print_summary(
+        "Report Generation",
+        [
+            ("Report", str(report_path)),
+            ("Assets", str(args.assets)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
 def _run_full(args: argparse.Namespace) -> int:
     raw_df, cleaning_result, bundle = _load_clean_analyze(args)
-    save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
-    save_dataframe(
+    _step("Saving CSV outputs...")
+    clean_csv = save_dataframe(cleaning_result.data, args.output / "cleaned_data.csv")
+    feat_csv = save_dataframe(
         bundle.feature_engineering.data, args.output / "engineered_features.csv"
     )
     _render_report_bundle(raw_df, cleaning_result, bundle, args)
+    report_path = args.output / "README.md"
+    logging.getLogger("agripak.data").info(
+        "Completed full pipeline into %s", args.output
+    )
+    _print_summary(
+        "Full Pipeline",
+        [
+            ("Cleaned CSV", str(clean_csv)),
+            ("Engineered CSV", str(feat_csv)),
+            ("Report", str(report_path)),
+            ("Assets", str(args.assets)),
+        ],
+    )
     return EXIT_SUCCESS
 
 
@@ -227,23 +396,81 @@ def _dispatch(args: argparse.Namespace) -> int:
     return handler(args)
 
 
+def _print_help(parser: argparse.ArgumentParser, topic: str | None) -> int:
+    if topic is not None:
+        try:
+            parser.parse_args([topic, "--help"])
+        except SystemExit:
+            return EXIT_SUCCESS
+    _print_summary("AgriPak CLI Commands", _COMMAND_HELP)
+    parser.print_help()
+    return EXIT_SUCCESS
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    global _active_step
     debug = False
+    logger = logging.getLogger("agripak.data")
+    err_console = get_console(stderr=True)
     try:
-        args = build_parser().parse_args(list(argv) if argv is not None else None)
+        parser = build_parser()
+        args = parser.parse_args(list(argv) if argv is not None else None)
+        if args.command == "help":
+            return _print_help(parser, getattr(args, "topic", None))
         debug = bool(getattr(args, "debug", False))
-        configure_logging(debug=debug)
+        logger = configure_logging(debug=debug, log_dir=args.log_dir)
+        logger.info("Running command '%s' on input '%s'", args.command, args.input)
         _validate_args(args)
-        return _dispatch(args)
+        start = time.perf_counter()
+        total_steps = _COMMAND_STEPS.get(args.command, 1)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TextColumn("ETA"),
+            TimeRemainingColumn(),
+            console=err_console,
+            transient=True,
+        ) as progress:
+            task_id = progress.add_task(f"Running {args.command}...", total=total_steps)
+            started = False
+
+            def _advance(label: str) -> None:
+                nonlocal started
+                if started:
+                    progress.advance(task_id, 1)
+                started = True
+                progress.update(task_id, description=label)
+
+            _active_step = _advance
+            try:
+                code = _dispatch(args)
+            finally:
+                _active_step = None
+            progress.update(task_id, completed=total_steps)
+        elapsed = time.perf_counter() - start
+        logger.info("Completed '%s' in %.2fs", args.command, elapsed)
+        get_console().print(
+            f"[bold green]Done[/bold green] in [cyan]{elapsed:.2f}s[/cyan]"
+        )
+        return code
     except DataPipelineError as exc:
+        msg = format_cli_error(exc)
         if debug:
             traceback.print_exc(file=sys.stderr)
-        print(format_cli_error(exc), file=sys.stderr)
+        if logger.handlers:
+            logger.error("%s", msg)
+        else:
+            err_console.print(f"[bold red]{msg}[/bold red]")
         return exc.exit_code
     except Exception as exc:
+        msg = f"Unexpected error: {exc} (run with --debug for traceback)"
         if debug:
             traceback.print_exc(file=sys.stderr)
-        print(
-            f"Unexpected error: {exc} (run with --debug for traceback)", file=sys.stderr
-        )
+        if logger.handlers:
+            logger.error("%s", msg)
+        else:
+            err_console.print(f"[bold red]{msg}[/bold red]")
         return EXIT_UNEXPECTED

@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -339,9 +339,15 @@ def clean_dataset(
     missing_tokens: frozenset[str] = DEFAULT_MISSING_TOKENS,
     binary_map: Mapping[str, int] = DEFAULT_BINARY_MAP,
     fallback_label: str = UNIDENTIFIED,
+    on_step: Callable[[str], None] | None = None,
 ) -> CleaningResult:
     if df.empty or len(df.columns) == 0:
         raise EmptyDataError("Cannot clean an empty DataFrame")
+
+    def _tick(label: str) -> None:
+        if on_step is not None:
+            on_step(label)
+
     rows_before, memory_mb_before = len(df), _memory_usage_mb(df)
     initial = infer_schema(
         df,
@@ -350,14 +356,19 @@ def clean_dataset(
         binary_map=binary_map,
     )
     audit = CleaningAudit()
+    _tick("Normalizing text columns...")
     cleaned = normalize_text_columns(df, initial, audit, missing_tokens=missing_tokens)
+    _tick("Coercing column types...")
     cleaned = coerce_column_types(
         cleaned, initial, audit, binary_map=binary_map, missing_tokens=missing_tokens
     )
+    _tick("Validating numeric ranges...")
     cleaned = validate_numeric_ranges(cleaned, initial, audit)
+    _tick("Handling missing values and duplicates...")
     cleaned = handle_missing_and_duplicates(
         cleaned, initial, audit, fallback_label=fallback_label
     )
+    _tick("Finalizing dtypes...")
     cleaned = finalize_dtypes(cleaned, initial, audit)
     return CleaningResult(
         cleaned,

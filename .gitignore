@@ -37,6 +37,9 @@ src/data/analysis_summary.md
 # Environment, logs, and temp files
 .env
 .env.*
+log/
+logs/
+.logs/
 *.log
 *.tmp
 *.bak

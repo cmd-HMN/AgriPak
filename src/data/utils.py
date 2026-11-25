@@ -1,11 +1,12 @@
 import logging
 import math
-import sys
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from rich.console import Console
+from rich.logging import RichHandler
 
 from src.data.errors import ReportWriteError
 
@@ -80,18 +81,38 @@ def _format_cell(value: object, float_digits: int) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
 
 
-def configure_logging(debug: bool = False) -> logging.Logger:
+def get_console(stderr: bool = False) -> Console:
+    return Console(stderr=stderr)
+
+
+def configure_logging(
+    debug: bool = False, log_dir: Path | None = Path("log")
+) -> logging.Logger:
     logger = logging.getLogger("agripak.data")
     level = logging.DEBUG if debug else logging.INFO
     logger.setLevel(level)
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(
+    logger.propagate = False
+    for existing in list(logger.handlers):
+        logger.removeHandler(existing)
+        existing.close()
+    rich_handler = RichHandler(
+        console=Console(stderr=True),
+        rich_tracebacks=debug,
+        show_path=debug,
+        markup=True,
+    )
+    rich_handler.setLevel(level)
+    logger.addHandler(rich_handler)
+    if log_dir is not None:
+        target_dir = ensure_directory(Path(log_dir))
+        file_handler = logging.FileHandler(
+            target_dir / "agripak.log", encoding="utf-8"
+        )
+        file_handler.setLevel(level)
+        file_handler.setFormatter(
             logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
         )
-        logger.addHandler(handler)
-    for handler in logger.handlers:
-        handler.setLevel(level)
+        logger.addHandler(file_handler)
     return logger
 
 
