@@ -46,9 +46,22 @@ class _CLIArgumentParser(argparse.ArgumentParser):
         raise InvalidArgumentError(message)
 
 
-def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+_DEFAULT_OUTPUTS: dict[str, Path] = {
+    "run": Path("src/data"),
+    "report": Path("src/data"),
+    "audit": Path("src/assets"),
+    "analyze": Path("src/assets"),
+    "plot": Path("src/assets"),
+    "clean": Path("data/clean"),
+    "features": Path("data/clean"),
+}
+
+
+def _add_common_arguments(
+    parser: argparse.ArgumentParser, default_output: Path = Path("src/assets")
+) -> None:
     parser.add_argument("--input", type=Path, default=Path("data/raw"))
-    parser.add_argument("--output", type=Path, default=Path("src/data"))
+    parser.add_argument("--output", type=Path, default=default_output)
     parser.add_argument("--assets", type=Path, default=Path("src/assets"))
     parser.add_argument("--log-dir", type=Path, default=Path("log"))
     parser.add_argument("--target", type=str, default=None)
@@ -75,7 +88,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _CLIArgumentParser(prog="src.data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for name in ("run", "audit", "clean", "analyze", "features", "plot", "report"):
-        _add_common_arguments(subparsers.add_parser(name))
+        _add_common_arguments(
+            subparsers.add_parser(name),
+            default_output=_DEFAULT_OUTPUTS[name],
+        )
     help_parser = subparsers.add_parser("help")
     help_parser.add_argument(
         "topic",

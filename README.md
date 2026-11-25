@@ -6,7 +6,7 @@
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests: 63 passing](https://img.shields.io/badge/tests-63%20passing-brightgreen.svg)](#testing)
+[![Tests: 66 passing](https://img.shields.io/badge/tests-66%20passing-brightgreen.svg)](#testing)
 [![Pyright: 0 errors](https://img.shields.io/badge/pyright-0%20errors-brightgreen.svg)](#testing)
 [![Report: Dynamic](https://img.shields.io/badge/report-dynamic-blue.svg)](src/data/README.md)
 
@@ -72,39 +72,45 @@ python -m src.data report --input data/raw --output src/data --assets src/assets
 
 Run `python -m src.data --help` or `python -m src.data <command> --help` for full option details.
 
-| Command    | Description                                                                          |
-| ---------- | ------------------------------------------------------------------------------------ |
-| `run`      | Execute the full pipeline and write cleaned CSV, engineered CSV, plots, and report   |
-| `audit`    | Infer dynamic schema and run data quality and text-hygiene audit                     |
-| `clean`    | Run the 5-step cleaning pipeline and export `cleaned_data.csv` + `cleaning_audit.md` |
-| `analyze`  | Run full statistical EDA, leakage check, and cross-validated model evaluation        |
-| `features` | Infer risk threshold and export `engineered_features.csv`                            |
-| `plot`     | Generate all 15 exploratory and feature-engineering PNG charts                       |
-| `report`   | Run analysis, generate all charts, and write `src/data/README.md`                    |
+| Command    | Default `--output` | Description                                                                          |
+| ---------- | ------------------ | ------------------------------------------------------------------------------------ |
+| `run`      | `src/data`         | Execute the full pipeline and write cleaned CSV, engineered CSV, plots, and report   |
+| `audit`    | `src/assets`       | Infer dynamic schema and run data quality and text-hygiene audit (`quality_audit.md`) |
+| `clean`    | `data/clean`       | Run the 5-step cleaning pipeline and export `cleaned_data.csv` + `cleaning_audit.md` |
+| `analyze`  | `src/assets`       | Run full statistical EDA, leakage check, and CV benchmarks (`analysis_summary.md`)   |
+| `features` | `data/clean`       | Infer risk threshold and export `engineered_features.csv`                            |
+| `plot`     | `src/assets`       | Generate all 15 exploratory and feature-engineering PNG charts into `src/assets/`    |
+| `report`   | `src/data`         | Run analysis, generate all charts, and write `src/data/README.md`                    |
+| `help`     | —                  | Print Rich command table or help for a specific subcommand                           |
 
 ### Individual Step Examples
 
+All commands use sensible defaults (`--input data/raw`, `--assets src/assets`, `--log-dir log`), so you can run them directly:
+
 ```bash
-python -m src.data audit --input data/raw --output src/data
-python -m src.data clean --input data/raw --output src/data
-python -m src.data analyze --input data/raw --output src/data
-python -m src.data features --input data/raw --output src/data
-python -m src.data plot --input data/raw --assets src/assets
+uv run python -m src.data help
+uv run python -m src.data audit
+uv run python -m src.data clean
+uv run python -m src.data analyze
+uv run python -m src.data features
+uv run python -m src.data plot
+uv run python -m src.data report
 ```
 
 ### Common Flags
 
-| Flag               | Default      | Description                                                           |
-| ------------------ | ------------ | --------------------------------------------------------------------- |
-| `--input`          | `data/raw`   | Input dataset file or directory (`.csv`, `.tsv`, `.json`, `.parquet`) |
-| `--output`         | `src/data`   | Output directory for reports, audits, and exported CSVs               |
-| `--assets`         | `src/assets` | Output directory for generated PNG plots                              |
-| `--target`         | `None`       | Optional explicit target column (auto-inferred when omitted)          |
-| `--min-n`          | `None`       | Minimum subgroup size (defaults to `max(20, int(0.01 * n))`)          |
-| `--n-splits`       | `5`          | Number of Stratified K-Fold cross-validation splits                   |
-| `--leak-threshold` | `0.90`       | Single-feature association leakage threshold                          |
-| `--seed`           | `42`         | Random seed for split replication and cross-validation                |
-| `--debug`          | `False`      | Print full tracebacks to `stderr` on failure                          |
+| Flag               | Default                   | Description                                                           |
+| ------------------ | ------------------------- | --------------------------------------------------------------------- |
+| `--input`          | `data/raw`                | Input dataset file or directory (`.csv`, `.tsv`, `.json`, `.parquet`) |
+| `--output`         | Per command (table above) | Output directory for reports, audits, and exported CSVs               |
+| `--assets`         | `src/assets`              | Output directory for generated PNG plots                              |
+| `--log-dir`        | `log`                     | Directory for timestamped file logs (`log/agripak.log`, gitignored)   |
+| `--target`         | `None`                    | Optional explicit target column (auto-inferred when omitted)          |
+| `--min-n`          | `None`                    | Minimum subgroup size (defaults to `max(20, int(0.01 * n))`)          |
+| `--n-splits`       | `5`                       | Number of Stratified K-Fold cross-validation splits                   |
+| `--leak-threshold` | `0.90`                    | Single-feature association leakage threshold                          |
+| `--seed`           | `42`                      | Random seed for split replication and cross-validation                |
+| `--debug`          | `False`                   | Print full tracebacks to `stderr` on failure                          |
 
 ---
 
