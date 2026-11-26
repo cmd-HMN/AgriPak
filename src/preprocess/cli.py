@@ -14,20 +14,10 @@ from src.common.cli import (
     run_with_progress,
 )
 from src.common.core.errors import EXIT_SUCCESS, InvalidArgumentError
-from src.common.core.io import load_dataset, save_dataframe
-from src.common.dataset.columns import infer_schema
-from src.common.report.assembler import COMBINED_REPORT_PATH, relative_asset_prefix
-from src.preprocess.modeling.evaluation import evaluate_feature_sets
-from src.preprocess.modeling.workflow import run_preprocess_pipeline
-from src.preprocess.outputs.feature_charts import generate_preprocess_plots
-from src.preprocess.outputs.reporting import generate_preprocess_reports
-from src.preprocess.transforms.encoders import encode_categorical_columns
-from src.preprocess.transforms.scalers import scale_numeric_columns
-from src.preprocess.transforms.selection import select_features
-from src.preprocess.transforms.transformers import engineer_features
 
 _DEFAULT_OUT = Path("src/preprocess")
 _DEFAULT_ASSETS = Path("src/preprocess/assets")
+_DEFAULT_COMBINED_REPORT = Path("src/data/README.md")
 _CLI_SPEC = CLISpec(
     prog="python -m src.preprocess",
     description="AgriPak preprocessing, feature engineering, selection, and CV evaluation CLI.",
@@ -64,7 +54,7 @@ def _resolve_combined_report(args: argparse.Namespace) -> Path | None:
         return Path(args.combined_report)
     out_dir = Path(args.output)
     if out_dir == _DEFAULT_OUT or out_dir == Path("data/clean"):
-        return COMBINED_REPORT_PATH
+        return _DEFAULT_COMBINED_REPORT
     return None
 
 
@@ -74,6 +64,13 @@ def _cmd_run(args: argparse.Namespace, console: Console) -> int:
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.report.assembler import relative_asset_prefix
+        from src.preprocess.modeling.workflow import run_preprocess_pipeline
+        from src.preprocess.outputs.feature_charts import generate_preprocess_plots
+        from src.preprocess.outputs.reporting import generate_preprocess_reports
+
         tick("Loading dataset")
         df = load_dataset(Path(args.input))
         tick("Running preprocessing pipeline")
@@ -90,7 +87,7 @@ def _cmd_run(args: argparse.Namespace, console: Console) -> int:
         state["rows"] = len(df)
         state["bundle"] = bundle
 
-    run_with_progress(console, 4, "Preprocess Pipeline", _run)
+    run_with_progress(console, 5, "Preprocess Pipeline", _run)
     bundle = state["bundle"]
     print_summary_table(
         console,
@@ -106,10 +103,23 @@ def _cmd_run(args: argparse.Namespace, console: Console) -> int:
 
 def _cmd_transform(args: argparse.Namespace, console: Console) -> int:
     in_path = Path(args.input)
-    df = load_dataset(in_path)
-    res = engineer_features(df)
     out_file = Path(args.output) / "engineered.csv"
-    save_dataframe(res.df, out_file, source_input=in_path)
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset, save_dataframe
+        from src.preprocess.transforms.transformers import engineer_features
+
+        tick("Engineering features")
+        df = load_dataset(in_path)
+        res = engineer_features(df)
+        tick("Saving CSV")
+        save_dataframe(res.df, out_file, source_input=in_path)
+        state["res"] = res
+
+    run_with_progress(console, 3, "Transform Features", _run)
+    res = state["res"]
     print_summary_table(
         console,
         "Transform",
@@ -119,11 +129,23 @@ def _cmd_transform(args: argparse.Namespace, console: Console) -> int:
 
 
 def _cmd_encode(args: argparse.Namespace, console: Console) -> int:
-    df = load_dataset(Path(args.input))
-    schema = infer_schema(df)
-    res = encode_categorical_columns(
-        df, list(schema.categorical), method=args.encode_method
-    )
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.dataset.columns import infer_schema
+        from src.preprocess.transforms.encoders import encode_categorical_columns
+
+        tick("Encoding categoricals")
+        df = load_dataset(Path(args.input))
+        schema = infer_schema(df)
+        state["res"] = encode_categorical_columns(
+            df, list(schema.categorical), method=args.encode_method
+        )
+
+    run_with_progress(console, 2, "Encode Categoricals", _run)
+    res = state["res"]
     print_summary_table(
         console,
         "Encode",
@@ -137,11 +159,23 @@ def _cmd_encode(args: argparse.Namespace, console: Console) -> int:
 
 
 def _cmd_scale(args: argparse.Namespace, console: Console) -> int:
-    df = load_dataset(Path(args.input))
-    schema = infer_schema(df)
-    res = scale_numeric_columns(
-        df, list(schema.numeric_columns), method=args.scale_method
-    )
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.dataset.columns import infer_schema
+        from src.preprocess.transforms.scalers import scale_numeric_columns
+
+        tick("Scaling numerics")
+        df = load_dataset(Path(args.input))
+        schema = infer_schema(df)
+        state["res"] = scale_numeric_columns(
+            df, list(schema.numeric_columns), method=args.scale_method
+        )
+
+    run_with_progress(console, 2, "Scale Numerics", _run)
+    res = state["res"]
     print_summary_table(
         console,
         "Scale",
@@ -155,9 +189,22 @@ def _cmd_scale(args: argparse.Namespace, console: Console) -> int:
 
 
 def _cmd_select(args: argparse.Namespace, console: Console) -> int:
-    df = load_dataset(Path(args.input))
-    eng = engineer_features(df)
-    sel = select_features(eng.df, infer_schema(df), eng.engineered_cols)
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.dataset.columns import infer_schema
+        from src.preprocess.transforms.selection import select_features
+        from src.preprocess.transforms.transformers import engineer_features
+
+        tick("Selecting features")
+        df = load_dataset(Path(args.input))
+        eng = engineer_features(df)
+        state["sel"] = select_features(eng.df, infer_schema(df), eng.engineered_cols)
+
+    run_with_progress(console, 2, "Select Features", _run)
+    sel = state["sel"]
     print_summary_table(
         console,
         "Selection",
@@ -170,11 +217,25 @@ def _cmd_select(args: argparse.Namespace, console: Console) -> int:
 
 
 def _cmd_evaluate(args: argparse.Namespace, console: Console) -> int:
-    df = load_dataset(Path(args.input))
-    schema = infer_schema(df)
-    eng = engineer_features(df, schema)
-    sel = select_features(eng.df, schema, eng.engineered_cols)
-    ev = evaluate_feature_sets(eng.df, schema, sel)
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.dataset.columns import infer_schema
+        from src.preprocess.modeling.evaluation import evaluate_feature_sets
+        from src.preprocess.transforms.selection import select_features
+        from src.preprocess.transforms.transformers import engineer_features
+
+        tick("Running CV evaluation")
+        df = load_dataset(Path(args.input))
+        schema = infer_schema(df)
+        eng = engineer_features(df, schema)
+        sel = select_features(eng.df, schema, eng.engineered_cols)
+        state["ev"] = evaluate_feature_sets(eng.df, schema, sel)
+
+    run_with_progress(console, 2, "CV Evaluation", _run)
+    ev = state["ev"]
     print_summary_table(
         console,
         "CV Evaluation",
@@ -190,6 +251,11 @@ def _cmd_plot(args: argparse.Namespace, console: Console) -> int:
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.preprocess.modeling.workflow import run_preprocess_pipeline
+        from src.preprocess.outputs.feature_charts import generate_preprocess_plots
+
         tick("Loading dataset")
         df = load_dataset(Path(args.input))
         tick("Running pipeline")
@@ -197,7 +263,7 @@ def _cmd_plot(args: argparse.Namespace, console: Console) -> int:
         tick("Generating plots")
         state["plots"] = generate_preprocess_plots(bundle, Path(args.assets))
 
-    run_with_progress(console, 3, "Preprocess Plots", _run)
+    run_with_progress(console, 4, "Preprocess Plots", _run)
     plots = state["plots"]
     created = sum(1 for p in plots if p.path is not None)
     print_summary_table(
@@ -214,6 +280,13 @@ def _cmd_report(args: argparse.Namespace, console: Console) -> int:
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.common.report.assembler import relative_asset_prefix
+        from src.preprocess.modeling.workflow import run_preprocess_pipeline
+        from src.preprocess.outputs.feature_charts import generate_preprocess_plots
+        from src.preprocess.outputs.reporting import generate_preprocess_reports
+
         tick("Loading dataset")
         df = load_dataset(Path(args.input))
         tick("Running pipeline")
@@ -226,7 +299,7 @@ def _cmd_report(args: argparse.Namespace, console: Console) -> int:
             bundle, plots, out_dir, prefix, _resolve_combined_report(args)
         )
 
-    run_with_progress(console, 4, "Preprocess Report", _run)
+    run_with_progress(console, 5, "Preprocess Report", _run)
     readme_p, frag_p = state["paths"]
     print_summary_table(
         console, "Reports", [("README", str(readme_p)), ("Fragment", str(frag_p))]

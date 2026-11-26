@@ -17,16 +17,6 @@ from src.common.cli import (
     run_with_progress,
 )
 from src.common.core.errors import EXIT_SUCCESS, InvalidArgumentError
-from src.common.core.io import load_dataset, save_dataframe
-from src.common.report.assembler import (
-    COMBINED_REPORT_PATH,
-    DATA_FRAGMENT_PATH,
-    PREPROCESS_FRAGMENT_PATH,
-)
-from src.data.analysis import audit_data_quality, run_full_analysis
-from src.data.cleaning import clean_dataset
-from src.data.plotting import generate_all_plots
-from src.data.report import generate_report
 
 _SPEC = CLISpec(
     prog="python -m src.data",
@@ -37,6 +27,9 @@ _SPEC = CLISpec(
 )
 
 _SUBCOMMANDS = ("run", "audit", "clean", "analyze", "plot", "report", "help")
+_DEFAULT_REPORT = Path("src/data/README.md")
+_DEFAULT_FRAGMENT = Path("src/data/report_fragment.md")
+_DEFAULT_PREPROCESS_FRAGMENT = Path("src/preprocess/report_fragment.md")
 
 
 def _configure_extra(parser: argparse.ArgumentParser) -> None:
@@ -47,10 +40,10 @@ def _configure_extra(parser: argparse.ArgumentParser) -> None:
         choices=_SUBCOMMANDS,
     )
     parser.add_argument("--assets", type=Path, default=Path("src/data/assets"))
-    parser.add_argument("--report", type=Path, default=COMBINED_REPORT_PATH)
-    parser.add_argument("--fragment", type=Path, default=DATA_FRAGMENT_PATH)
+    parser.add_argument("--report", type=Path, default=_DEFAULT_REPORT)
+    parser.add_argument("--fragment", type=Path, default=_DEFAULT_FRAGMENT)
     parser.add_argument(
-        "--preprocess-fragment", type=Path, default=PREPROCESS_FRAGMENT_PATH
+        "--preprocess-fragment", type=Path, default=_DEFAULT_PREPROCESS_FRAGMENT
     )
     parser.add_argument("--min-n", type=int, default=None)
     parser.add_argument("--n-splits", type=int, default=5)
@@ -64,15 +57,28 @@ def _resolve_csv_output(output: Path) -> Path:
 def _cmd_audit(
     args: argparse.Namespace, console: Console, logger: logging.Logger
 ) -> int:
-    raw_df = load_dataset(args.input)
-    qa = audit_data_quality(raw_df)
-    logger.info("Audit complete: %d rows, %d cols", len(raw_df), len(raw_df.columns))
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.data.analysis import audit_data_quality
+
+        tick("Auditing dataset")
+        raw_df = load_dataset(args.input)
+        state["rows"] = len(raw_df)
+        state["cols"] = len(raw_df.columns)
+        state["qa"] = audit_data_quality(raw_df)
+
+    run_with_progress(console, 2, "Auditing Data", _run)
+    qa = state["qa"]
+    logger.info("Audit complete: %d rows, %d cols", state["rows"], state["cols"])
     print_summary_table(
         console,
         "Data Audit",
         [
-            ("Rows", f"{len(raw_df):,}"),
-            ("Columns", str(len(raw_df.columns))),
+            ("Rows", f"{state['rows']:,}"),
+            ("Columns", str(state["cols"])),
             ("Duplicates", str(qa.duplicate_count)),
         ],
     )
@@ -86,6 +92,10 @@ def _cmd_clean(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset, save_dataframe
+        from src.data.cleaning import clean_dataset
+
         tick("Loading dataset")
         raw_df = load_dataset(args.input)
         res = clean_dataset(raw_df, on_step=tick)
@@ -93,7 +103,7 @@ def _cmd_clean(
         save_dataframe(res.data, out_path, source_input=args.input)
         state["res"] = res
 
-    run_with_progress(console, 7, "Cleaning Data", _run)
+    run_with_progress(console, 8, "Cleaning Data", _run)
     res = state["res"]
     logger.info("Cleaned data written to %s (%d rows)", out_path, res.rows_after)
     print_summary_table(
@@ -114,6 +124,11 @@ def _cmd_analyze(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.data.analysis import run_full_analysis
+        from src.data.cleaning import clean_dataset
+
         tick("Loading dataset")
         raw_df = load_dataset(args.input)
         clean_res = clean_dataset(raw_df, on_step=tick)
@@ -127,7 +142,7 @@ def _cmd_analyze(
             leak_threshold=args.leak_threshold,
         )
 
-    run_with_progress(console, 7, "Analyzing Data", _run)
+    run_with_progress(console, 8, "Analyzing Data", _run)
     bundle = state["bundle"]
     logger.info("Analysis complete: %d rows", bundle.row_count)
     print_summary_table(
@@ -148,6 +163,12 @@ def _cmd_plot(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.data.analysis import run_full_analysis
+        from src.data.cleaning import clean_dataset
+        from src.data.plotting import generate_all_plots
+
         tick("Loading dataset")
         raw_df = load_dataset(args.input)
         clean_res = clean_dataset(raw_df, on_step=tick)
@@ -163,7 +184,7 @@ def _cmd_plot(
         tick("Generating plots")
         state["plots"] = generate_all_plots(clean_res.data, bundle, args.assets)
 
-    run_with_progress(console, 8, "Generating Plots", _run)
+    run_with_progress(console, 9, "Generating Plots", _run)
     plots = state["plots"]
     generated = sum(1 for p in plots if p.generated)
     logger.info("Generated %d/%d plots in %s", generated, len(plots), args.assets)
@@ -184,6 +205,13 @@ def _cmd_report(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset
+        from src.data.analysis import run_full_analysis
+        from src.data.cleaning import clean_dataset
+        from src.data.plotting import generate_all_plots
+        from src.data.report import generate_report
+
         tick("Loading dataset")
         raw_df = load_dataset(args.input)
         clean_res = clean_dataset(raw_df, on_step=tick)
@@ -212,7 +240,7 @@ def _cmd_report(
         state["plots"] = plots
         state["bundle"] = bundle
 
-    run_with_progress(console, 9, "Data Report", _run)
+    run_with_progress(console, 10, "Data Report", _run)
     out = state["out"]
     plots = state["plots"]
     bundle = state["bundle"]
@@ -230,13 +258,18 @@ def _cmd_report(
     return EXIT_SUCCESS
 
 
-def _cmd_run(
-    args: argparse.Namespace, console: Console, logger: logging.Logger
-) -> int:
+def _cmd_run(args: argparse.Namespace, console: Console, logger: logging.Logger) -> int:
     out_csv = _resolve_csv_output(args.output)
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
+        tick("Loading modules")
+        from src.common.core.io import load_dataset, save_dataframe
+        from src.data.analysis import run_full_analysis
+        from src.data.cleaning import clean_dataset
+        from src.data.plotting import generate_all_plots
+        from src.data.report import generate_report
+
         tick("Loading dataset")
         raw_df = load_dataset(args.input)
         clean_res = clean_dataset(raw_df, on_step=tick)
@@ -268,7 +301,7 @@ def _cmd_run(
         state["plots"] = plots
         state["out_report"] = out_report
 
-    run_with_progress(console, 10, "Data Pipeline", _run)
+    run_with_progress(console, 11, "Data Pipeline", _run)
     bundle = state["bundle"]
     plots = state["plots"]
     generated = sum(1 for p in plots if p.generated)
@@ -286,9 +319,7 @@ def _cmd_run(
     return EXIT_SUCCESS
 
 
-def _execute(
-    args: argparse.Namespace, console: Console, logger: logging.Logger
-) -> int:
+def _execute(args: argparse.Namespace, console: Console, logger: logging.Logger) -> int:
     if args.command == "help":
         print_cli_help(build_cli_parser(_SPEC, _configure_extra), console)
         return EXIT_SUCCESS
