@@ -1,15 +1,16 @@
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Sequence, cast
+from typing import Any, cast
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from src.common.core.io import ensure_directory
 
@@ -136,10 +137,10 @@ def run_plot_jobs(
 ) -> list[PlotArtifact]:
     artifacts: list[PlotArtifact] = []
     for spec, job in jobs:
-        if progress_callback is not None:
-            progress_callback(spec.title)
         try:
             artifacts.append(job())
         except Exception as exc:
             artifacts.append(skip_plot(spec, f"plot failed: {exc}"))
+        if progress_callback is not None:
+            progress_callback(spec.title)
     return artifacts

@@ -20,14 +20,8 @@ def test_preprocess_cli_commands(tmp_path: Path, prep_csv_path: Path) -> None:
         ).returncode
         == 0
     )
-    assert (
-        _run_prep_cli(["encode", "--input", str(prep_csv_path)]).returncode
-        == 0
-    )
-    assert (
-        _run_prep_cli(["scale", "--input", str(prep_csv_path)]).returncode
-        == 0
-    )
+    assert _run_prep_cli(["encode", "--input", str(prep_csv_path)]).returncode == 0
+    assert _run_prep_cli(["scale", "--input", str(prep_csv_path)]).returncode == 0
     assert _run_prep_cli(["select", "--input", str(prep_csv_path)]).returncode == 0
     assert _run_prep_cli(["evaluate", "--input", str(prep_csv_path)]).returncode == 0
     assert (

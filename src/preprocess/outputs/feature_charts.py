@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from src.common.core.validation import UNIDENTIFIED, as_series, to_numeric_series
 from src.common.dataset.columns import extract_binary_target
 from src.common.report.plotting import (
     PlotArtifact,
@@ -14,7 +16,6 @@ from src.common.report.plotting import (
     run_plot_jobs,
     skip_plot,
 )
-from src.common.core.validation import UNIDENTIFIED, as_series, to_numeric_series
 from src.preprocess.modeling.workflow import PreprocessBundle
 
 _SPEC_ENG = PlotSpec(
@@ -168,7 +169,9 @@ def _plot_cv_model_comparison(bundle: PreprocessBundle, out_dir: Path) -> PlotAr
 
 
 def generate_preprocess_plots(
-    bundle: PreprocessBundle, out_dir: Path
+    bundle: PreprocessBundle,
+    out_dir: Path,
+    on_plot: Callable[[str], None] | None = None,
 ) -> list[PlotArtifact]:
     jobs = [
         (_SPEC_ENG, lambda: _plot_engineered_features(bundle, out_dir)),
@@ -176,4 +179,4 @@ def generate_preprocess_plots(
         (_SPEC_DRV, lambda: _plot_driver_by_signal_curves(bundle, out_dir)),
         (_SPEC_CV, lambda: _plot_cv_model_comparison(bundle, out_dir)),
     ]
-    return run_plot_jobs(jobs)
+    return run_plot_jobs(jobs, on_plot)

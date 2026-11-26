@@ -3,7 +3,7 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from rich.console import Console
 from rich.panel import Panel
@@ -11,6 +11,7 @@ from rich.progress import (
     BarColumn,
     Progress,
     SpinnerColumn,
+    TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
@@ -89,26 +90,31 @@ def print_cli_help(parser: argparse.ArgumentParser, console: Console) -> None:
 
 def run_with_progress(
     console: Console,
-    total: int,
+    total: float,
     description: str,
-    runner: Callable[[Callable[[str], None]], None],
+    runner: Callable[[Any], None],
 ) -> None:
+    _ = console
+    total_f = max(1.0, float(total))
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
+        TaskProgressColumn(),
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         console=get_console(stderr=True),
         transient=True,
     ) as progress:
-        task_id = progress.add_task(description, total=max(1, total))
+        task_id = progress.add_task(description, total=total_f)
 
-        def advance(stage: str) -> None:
-            progress.update(task_id, advance=1, description=f"{description}: {stage}")
+        def advance(stage: str, weight: float = 1.0) -> None:
+            progress.update(
+                task_id, advance=weight, description=f"{description}: {stage}"
+            )
 
         runner(advance)
+        progress.update(task_id, completed=total_f)
 
 
 def handle_cli_exception(

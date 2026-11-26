@@ -1,13 +1,14 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
-from src.common.dataset.columns import apply_to_columns
-from src.common.core.validation import as_series, require_non_empty, to_numeric_series
 from src.common.core.errors import TransformError
+from src.common.core.validation import as_series, require_non_empty, to_numeric_series
+from src.common.dataset.columns import apply_to_columns
 
 
 @dataclass(frozen=True)

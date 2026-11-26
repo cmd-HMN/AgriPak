@@ -2,18 +2,13 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from src.common.core.errors import TransformError
+    from src.preprocess.cli import main
     from src.preprocess.modeling.builders import (
         build_column_transformer,
         build_hgb_pipeline,
         build_logistic_pipeline,
     )
-    from src.preprocess.cli import main
-    from src.preprocess.transforms.encoders import (
-        EncodingResult,
-        build_categorical_encoder,
-        encode_categorical_columns,
-    )
-    from src.common.core.errors import TransformError
     from src.preprocess.modeling.evaluation import (
         EvaluationResult,
         evaluate_feature_sets,
@@ -28,6 +23,11 @@ if TYPE_CHECKING:
         build_preprocess_readme,
         generate_preprocess_reports,
         render_preprocess_sections,
+    )
+    from src.preprocess.transforms.encoders import (
+        EncodingResult,
+        build_categorical_encoder,
+        encode_categorical_columns,
     )
     from src.preprocess.transforms.scalers import (
         ScalingResult,

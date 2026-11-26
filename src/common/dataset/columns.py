@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Callable, cast
+from typing import cast
 
 import pandas as pd
 

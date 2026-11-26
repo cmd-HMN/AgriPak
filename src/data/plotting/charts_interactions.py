@@ -13,7 +13,6 @@ from src.common.dataset.columns import DatasetSchema, is_identified, resolve_dri
 from src.common.report.plotting import PlotArtifact, qcut_series
 from src.data.analysis import CombinationResult
 from src.data.plotting.chart_helpers import (
-    _PlotSpec,
     _barh,
     _baseline,
     _cat,
@@ -22,6 +21,7 @@ from src.data.plotting.chart_helpers import (
     _heatmap,
     _num,
     _nunique,
+    _PlotSpec,
     _skip,
 )
 

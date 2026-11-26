@@ -7,6 +7,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from src.common.dataset.columns import DatasetSchema, is_identified
 from src.data.analysis.types import (
     CombinationResult,
     _flt,
@@ -17,7 +18,6 @@ from src.data.analysis.types import (
     _target_series,
     _txt,
 )
-from src.common.dataset.columns import DatasetSchema, is_identified
 
 
 def _build_condition_items(

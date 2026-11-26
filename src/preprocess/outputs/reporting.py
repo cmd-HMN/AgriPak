@@ -1,20 +1,18 @@
 from pathlib import Path
 
-import pandas as pd
-
 from src.common.core.io import ensure_directory, write_text_file
+from src.common.core.validation import UNIDENTIFIED
+from src.common.report.assembler import (
+    COMBINED_REPORT_PATH,
+    assemble_combined_report,
+    write_fragment,
+)
 from src.common.report.markdown import (
     append_markdown_table,
     render_exit_code_table,
     render_plot_markdown,
 )
 from src.common.report.plotting import PlotArtifact
-from src.common.report.assembler import (
-    COMBINED_REPORT_PATH,
-    assemble_combined_report,
-    write_fragment,
-)
-from src.common.core.validation import UNIDENTIFIED
 from src.preprocess.modeling.workflow import PreprocessBundle
 
 

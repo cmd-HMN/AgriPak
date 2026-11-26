@@ -30,7 +30,7 @@ def _numeric_shape_row(col: str, vals: pd.Series) -> dict[str, object]:
     outliers = int(((vals < lower) | (vals > upper)).sum())
     return {
         "column": col,
-        "count": int(len(vals)),
+        "count": len(vals),
         "mean": float(vals.mean()),
         "std": to_float(vals.std(ddof=1), 0.0) if len(vals) > 1 else 0.0,
         "median": to_float(vals.median(), 0.0),
@@ -81,7 +81,7 @@ def compute_spearman_with_target(
         rows.append(
             {
                 "column": col,
-                "n": int(len(pair)),
+                "n": len(pair),
                 "spearman_rho": rho,
                 "abs_spearman": abs(rho),
                 "p_value": pval,

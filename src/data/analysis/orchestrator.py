@@ -5,11 +5,14 @@ from typing import cast
 
 import pandas as pd
 
-from src.data.analysis.interactions import (
-    analyze_feature_combinations,
-    compute_subgroup_risk_surfaces,
+from src.common.core.errors import AnalysisError
+from src.common.core.validation import compute_min_subgroup_size
+from src.common.dataset.columns import (
+    UNIDENTIFIED,
+    DatasetSchema,
+    is_identified,
+    resolve_drivers,
 )
-from src.data.analysis.leakage import collect_synthetic_notes, run_leakage_check
 from src.data.analysis.associations import (
     compute_cramers_v_tables,
     compute_ranked_target_correlations,
@@ -17,6 +20,11 @@ from src.data.analysis.associations import (
     run_kruskal_wallis_grid,
     run_mann_whitney_tests,
 )
+from src.data.analysis.interactions import (
+    analyze_feature_combinations,
+    compute_subgroup_risk_surfaces,
+)
+from src.data.analysis.leakage import collect_synthetic_notes, run_leakage_check
 from src.data.analysis.profiling import (
     audit_data_quality,
     compute_categorical_summaries,
@@ -31,14 +39,6 @@ from src.data.analysis.types import (
     _num,
     _target_series,
 )
-from src.common.dataset.columns import (
-    UNIDENTIFIED,
-    DatasetSchema,
-    is_identified,
-    resolve_drivers,
-)
-from src.common.core.validation import compute_min_subgroup_size
-from src.common.core.errors import AnalysisError
 
 
 def run_full_analysis(

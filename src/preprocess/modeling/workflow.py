@@ -2,13 +2,13 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from src.common.dataset.columns import DatasetSchema, infer_schema
 from src.common.core.validation import require_non_empty
+from src.common.dataset.columns import DatasetSchema, infer_schema
+from src.preprocess.modeling.evaluation import EvaluationResult, evaluate_feature_sets
 from src.preprocess.transforms.encoders import (
     EncodingResult,
     encode_categorical_columns,
 )
-from src.preprocess.modeling.evaluation import EvaluationResult, evaluate_feature_sets
 from src.preprocess.transforms.scalers import ScalingResult, scale_numeric_columns
 from src.preprocess.transforms.selection import FeatureSelectionResult, select_features
 from src.preprocess.transforms.transformers import (

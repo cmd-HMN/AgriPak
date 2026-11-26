@@ -139,12 +139,12 @@ def ensure_not_overwriting_input(
     resolved_out = Path(output_path).resolve()
     resolved_in = Path(input_path).resolve()
     if resolved_in.is_file() and resolved_out == resolved_in:
-        raise ReportWriteError(
-            f"Refusing to overwrite input file '{resolved_in}'."
-        )
+        raise ReportWriteError(f"Refusing to overwrite input file '{resolved_in}'.")
     if resolved_in.is_dir():
         has_files = any(p.is_file() for p in resolved_in.iterdir())
-        if has_files and (resolved_out == resolved_in or resolved_in in resolved_out.parents):
+        if has_files and (
+            resolved_out == resolved_in or resolved_in in resolved_out.parents
+        ):
             raise ReportWriteError(
                 f"Refusing to write inside raw input directory '{resolved_in}'."
             )

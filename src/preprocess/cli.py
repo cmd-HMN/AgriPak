@@ -64,22 +64,24 @@ def _cmd_run(args: argparse.Namespace, console: Console) -> int:
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.common.report.assembler import relative_asset_prefix
         from src.preprocess.modeling.workflow import run_preprocess_pipeline
         from src.preprocess.outputs.feature_charts import generate_preprocess_plots
         from src.preprocess.outputs.reporting import generate_preprocess_reports
 
-        tick("Loading dataset")
+        tick("Loading dataset", 10.0)
         df = load_dataset(Path(args.input))
-        tick("Running preprocessing pipeline")
+        tick("Running preprocessing pipeline", 10.0)
         bundle = run_preprocess_pipeline(
             df, scale_method=args.scale_method, encode_method=args.encode_method
         )
-        tick("Generating plots")
-        plots = generate_preprocess_plots(bundle, assets_dir)
-        tick("Writing reports")
+        tick("Generating plots", 45.0)
+        plots = generate_preprocess_plots(
+            bundle, assets_dir, on_plot=lambda p: tick(f"Plot {p}", 6.25)
+        )
+        tick("Writing reports", 5.0)
         prefix = relative_asset_prefix(assets_dir, out_dir)
         generate_preprocess_reports(
             bundle, plots, out_dir, prefix, _resolve_combined_report(args)
@@ -87,7 +89,7 @@ def _cmd_run(args: argparse.Namespace, console: Console) -> int:
         state["rows"] = len(df)
         state["bundle"] = bundle
 
-    run_with_progress(console, 5, "Preprocess Pipeline", _run)
+    run_with_progress(console, 100.0, "Preprocess Pipeline", _run)
     bundle = state["bundle"]
     print_summary_table(
         console,
@@ -280,26 +282,28 @@ def _cmd_report(args: argparse.Namespace, console: Console) -> int:
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.common.report.assembler import relative_asset_prefix
         from src.preprocess.modeling.workflow import run_preprocess_pipeline
         from src.preprocess.outputs.feature_charts import generate_preprocess_plots
         from src.preprocess.outputs.reporting import generate_preprocess_reports
 
-        tick("Loading dataset")
+        tick("Loading dataset", 10.0)
         df = load_dataset(Path(args.input))
-        tick("Running pipeline")
+        tick("Running pipeline", 10.0)
         bundle = run_preprocess_pipeline(df, run_cv=True)
-        tick("Generating plots")
-        plots = generate_preprocess_plots(bundle, assets_dir)
-        tick("Writing reports")
+        tick("Generating plots", 45.0)
+        plots = generate_preprocess_plots(
+            bundle, assets_dir, on_plot=lambda p: tick(f"Plot {p}", 6.25)
+        )
+        tick("Writing reports", 5.0)
         prefix = relative_asset_prefix(assets_dir, out_dir)
         state["paths"] = generate_preprocess_reports(
             bundle, plots, out_dir, prefix, _resolve_combined_report(args)
         )
 
-    run_with_progress(console, 5, "Preprocess Report", _run)
+    run_with_progress(console, 100.0, "Preprocess Report", _run)
     readme_p, frag_p = state["paths"]
     print_summary_table(
         console, "Reports", [("README", str(readme_p)), ("Fragment", str(frag_p))]

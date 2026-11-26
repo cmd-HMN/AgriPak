@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.common.report.plotting import PlotArtifact
 from src.data.plotting.charts_eda import (
     plot_binary_flag_counts,
     plot_categorical_counts,
@@ -19,7 +20,6 @@ from src.data.plotting.charts_interactions import (
     plot_top_combinations,
 )
 from src.data.plotting.generate import generate_all_plots
-from src.common.report.plotting import PlotArtifact
 
 __all__ = [
     "PlotArtifact",

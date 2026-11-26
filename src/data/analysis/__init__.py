@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from src.data.analysis.associations import (
+    compute_cramers_v,
+    compute_cramers_v_tables,
+    compute_ranked_target_correlations,
+    compute_spearman_matrix,
+    run_kruskal_wallis_grid,
+    run_mann_whitney_tests,
+)
 from src.data.analysis.interactions import (
     analyze_feature_combinations,
     compute_subgroup_risk_surfaces,
@@ -9,14 +17,6 @@ from src.data.analysis.leakage import (
     run_leakage_check,
 )
 from src.data.analysis.orchestrator import run_full_analysis
-from src.data.analysis.associations import (
-    compute_cramers_v,
-    compute_cramers_v_tables,
-    compute_ranked_target_correlations,
-    compute_spearman_matrix,
-    run_kruskal_wallis_grid,
-    run_mann_whitney_tests,
-)
 from src.data.analysis.profiling import (
     audit_data_quality,
     compute_categorical_summaries,

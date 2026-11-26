@@ -60,17 +60,18 @@ def _cmd_audit(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.data.analysis import audit_data_quality
 
-        tick("Auditing dataset")
+        tick("Loading dataset", 20.0)
         raw_df = load_dataset(args.input)
+        tick("Auditing quality", 35.0)
         state["rows"] = len(raw_df)
         state["cols"] = len(raw_df.columns)
         state["qa"] = audit_data_quality(raw_df)
 
-    run_with_progress(console, 2, "Auditing Data", _run)
+    run_with_progress(console, 100.0, "Auditing Data", _run)
     qa = state["qa"]
     logger.info("Audit complete: %d rows, %d cols", state["rows"], state["cols"])
     print_summary_table(
@@ -92,18 +93,19 @@ def _cmd_clean(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset, save_dataframe
         from src.data.cleaning import clean_dataset
 
-        tick("Loading dataset")
+        tick("Loading dataset", 15.0)
         raw_df = load_dataset(args.input)
-        res = clean_dataset(raw_df, on_step=tick)
-        tick("Saving cleaned CSV")
+        tick("Cleaning dataset", 20.0)
+        res = clean_dataset(raw_df, on_step=lambda s: tick(s, 9.0))
+        tick("Saving cleaned CSV", 5.0)
         save_dataframe(res.data, out_path, source_input=args.input)
         state["res"] = res
 
-    run_with_progress(console, 8, "Cleaning Data", _run)
+    run_with_progress(console, 100.0, "Cleaning Data", _run)
     res = state["res"]
     logger.info("Cleaned data written to %s (%d rows)", out_path, res.rows_after)
     print_summary_table(
@@ -124,15 +126,16 @@ def _cmd_analyze(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.data.analysis import run_full_analysis
         from src.data.cleaning import clean_dataset
 
-        tick("Loading dataset")
+        tick("Loading dataset", 10.0)
         raw_df = load_dataset(args.input)
-        clean_res = clean_dataset(raw_df, on_step=tick)
-        tick("Running statistical analysis")
+        tick("Cleaning dataset", 10.0)
+        clean_res = clean_dataset(raw_df, on_step=lambda s: tick(s, 4.0))
+        tick("Running statistical analysis", 10.0)
         state["bundle"] = run_full_analysis(
             clean_res.data,
             clean_res.schema,
@@ -142,7 +145,7 @@ def _cmd_analyze(
             leak_threshold=args.leak_threshold,
         )
 
-    run_with_progress(console, 8, "Analyzing Data", _run)
+    run_with_progress(console, 100.0, "Analyzing Data", _run)
     bundle = state["bundle"]
     logger.info("Analysis complete: %d rows", bundle.row_count)
     print_summary_table(
@@ -163,16 +166,17 @@ def _cmd_plot(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.data.analysis import run_full_analysis
         from src.data.cleaning import clean_dataset
         from src.data.plotting import generate_all_plots
 
-        tick("Loading dataset")
+        tick("Loading dataset", 5.0)
         raw_df = load_dataset(args.input)
-        clean_res = clean_dataset(raw_df, on_step=tick)
-        tick("Running analysis")
+        tick("Cleaning dataset", 5.0)
+        clean_res = clean_dataset(raw_df, on_step=lambda s: tick(s, 2.0))
+        tick("Running analysis", 5.0)
         bundle = run_full_analysis(
             clean_res.data,
             clean_res.schema,
@@ -181,10 +185,15 @@ def _cmd_plot(
             n_splits=args.n_splits,
             leak_threshold=args.leak_threshold,
         )
-        tick("Generating plots")
-        state["plots"] = generate_all_plots(clean_res.data, bundle, args.assets)
+        tick("Generating plots", 25.0)
+        state["plots"] = generate_all_plots(
+            clean_res.data,
+            bundle,
+            args.assets,
+            on_plot=lambda name: tick(f"Plot {name}", 3.5),
+        )
 
-    run_with_progress(console, 9, "Generating Plots", _run)
+    run_with_progress(console, 100.0, "Generating Plots", _run)
     plots = state["plots"]
     generated = sum(1 for p in plots if p.generated)
     logger.info("Generated %d/%d plots in %s", generated, len(plots), args.assets)
@@ -205,17 +214,18 @@ def _cmd_report(
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset
         from src.data.analysis import run_full_analysis
         from src.data.cleaning import clean_dataset
         from src.data.plotting import generate_all_plots
         from src.data.report import generate_report
 
-        tick("Loading dataset")
+        tick("Loading dataset", 5.0)
         raw_df = load_dataset(args.input)
-        clean_res = clean_dataset(raw_df, on_step=tick)
-        tick("Running analysis")
+        tick("Cleaning dataset", 5.0)
+        clean_res = clean_dataset(raw_df, on_step=lambda s: tick(s, 2.0))
+        tick("Running analysis", 5.0)
         bundle = run_full_analysis(
             clean_res.data,
             clean_res.schema,
@@ -224,9 +234,14 @@ def _cmd_report(
             n_splits=args.n_splits,
             leak_threshold=args.leak_threshold,
         )
-        tick("Generating plots")
-        plots = generate_all_plots(clean_res.data, bundle, args.assets)
-        tick("Writing report")
+        tick("Generating plots", 25.0)
+        plots = generate_all_plots(
+            clean_res.data,
+            bundle,
+            args.assets,
+            on_plot=lambda name: tick(f"Plot {name}", 3.0),
+        )
+        tick("Writing report", 8.0)
         state["out"] = generate_report(
             raw_df,
             clean_res,
@@ -240,7 +255,7 @@ def _cmd_report(
         state["plots"] = plots
         state["bundle"] = bundle
 
-    run_with_progress(console, 10, "Data Report", _run)
+    run_with_progress(console, 100.0, "Data Report", _run)
     out = state["out"]
     plots = state["plots"]
     bundle = state["bundle"]
@@ -263,19 +278,20 @@ def _cmd_run(args: argparse.Namespace, console: Console, logger: logging.Logger)
     state: dict[str, Any] = {}
 
     def _run(tick: Any) -> None:
-        tick("Loading modules")
+        tick("Loading modules", 0.0)
         from src.common.core.io import load_dataset, save_dataframe
         from src.data.analysis import run_full_analysis
         from src.data.cleaning import clean_dataset
         from src.data.plotting import generate_all_plots
         from src.data.report import generate_report
 
-        tick("Loading dataset")
+        tick("Loading dataset", 5.0)
         raw_df = load_dataset(args.input)
-        clean_res = clean_dataset(raw_df, on_step=tick)
-        tick("Saving cleaned CSV")
+        tick("Cleaning dataset", 5.0)
+        clean_res = clean_dataset(raw_df, on_step=lambda s: tick(s, 2.0))
+        tick("Saving cleaned CSV", 5.0)
         save_dataframe(clean_res.data, out_csv, source_input=args.input)
-        tick("Running analysis")
+        tick("Running analysis", 5.0)
         bundle = run_full_analysis(
             clean_res.data,
             clean_res.schema,
@@ -284,9 +300,14 @@ def _cmd_run(args: argparse.Namespace, console: Console, logger: logging.Logger)
             n_splits=args.n_splits,
             leak_threshold=args.leak_threshold,
         )
-        tick("Generating plots")
-        plots = generate_all_plots(clean_res.data, bundle, args.assets)
-        tick("Writing report")
+        tick("Generating plots", 20.0)
+        plots = generate_all_plots(
+            clean_res.data,
+            bundle,
+            args.assets,
+            on_plot=lambda name: tick(f"Plot {name}", 3.0),
+        )
+        tick("Writing report", 8.0)
         out_report = generate_report(
             raw_df,
             clean_res,
@@ -301,7 +322,7 @@ def _cmd_run(args: argparse.Namespace, console: Console, logger: logging.Logger)
         state["plots"] = plots
         state["out_report"] = out_report
 
-    run_with_progress(console, 11, "Data Pipeline", _run)
+    run_with_progress(console, 100.0, "Data Pipeline", _run)
     bundle = state["bundle"]
     plots = state["plots"]
     generated = sum(1 for p in plots if p.generated)

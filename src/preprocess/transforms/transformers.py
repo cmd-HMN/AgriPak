@@ -3,18 +3,18 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.common.core.validation import (
+    UNIDENTIFIED,
+    as_series,
+    require_non_empty,
+    to_numeric_series,
+)
 from src.common.dataset.columns import (
     DatasetSchema,
     extract_binary_target,
     infer_schema,
     resolve_drivers,
     series_to_float,
-)
-from src.common.core.validation import (
-    UNIDENTIFIED,
-    as_series,
-    require_non_empty,
-    to_numeric_series,
 )
 
 
