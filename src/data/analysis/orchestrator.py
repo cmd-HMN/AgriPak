@@ -5,27 +5,32 @@ from typing import cast
 
 import pandas as pd
 
+from src.common.core.errors import AnalysisError
+from src.common.core.validation import compute_min_subgroup_size
+from src.common.dataset.columns import (
+    UNIDENTIFIED,
+    DatasetSchema,
+    is_identified,
+    resolve_drivers,
+)
+from src.data.analysis.associations import (
+    compute_cramers_v_tables,
+    compute_ranked_target_correlations,
+    compute_spearman_matrix,
+    run_kruskal_wallis_grid,
+    run_mann_whitney_tests,
+)
 from src.data.analysis.interactions import (
     analyze_feature_combinations,
     compute_subgroup_risk_surfaces,
 )
-from src.data.analysis.modeling import (
-    _collect_synthetic_notes,
-    engineer_features,
-    run_leakage_check,
-    validate_models_cv,
-)
-from src.data.analysis.stats import (
+from src.data.analysis.leakage import collect_synthetic_notes, run_leakage_check
+from src.data.analysis.profiling import (
     audit_data_quality,
     compute_categorical_summaries,
-    compute_cramers_v_tables,
     compute_decile_target_curves,
     compute_numeric_shape_metrics,
-    compute_ranked_target_correlations,
-    compute_spearman_matrix,
     compute_target_rates_by_group,
-    run_kruskal_wallis_grid,
-    run_mann_whitney_tests,
 )
 from src.data.analysis.types import (
     AnalysisBundle,
@@ -34,9 +39,6 @@ from src.data.analysis.types import (
     _num,
     _target_series,
 )
-from src.data.errors import AnalysisError
-from src.data.schema import DatasetSchema, resolve_drivers
-from src.data.utils import UNIDENTIFIED, compute_min_subgroup_size, is_identified
 
 
 def run_full_analysis(
@@ -83,15 +85,7 @@ def run_full_analysis(
     _tick("Computing Cramer's V associations...")
     tv, pv = compute_cramers_v_tables(clean_df, cbc, tc)
     _tick("Running leakage check...")
-    leak_df, flagged = run_leakage_check(
-        clean_df,
-        rs,
-        leak_threshold=leak_threshold,
-        n_splits=n_splits,
-        random_state=random_state,
-    )
-    _tick("Engineering features...")
-    fe = engineer_features(clean_df, rs)
+    leak_df, flagged = run_leakage_check(clean_df, rs, threshold=leak_threshold)
     num_desc = (
         cast(
             pd.DataFrame, pd.DataFrame({c: _num(clean_df[c]) for c in nc}).describe().T
@@ -110,10 +104,6 @@ def run_full_analysis(
     surfaces = compute_subgroup_risk_surfaces(clean_df, dx, dy, tc, sub_col, mn)
     _tick("Running Kruskal-Wallis tests...")
     kw = run_kruskal_wallis_grid(clean_df, nc, cc)
-    _tick("Validating CV models...")
-    cv_auc = validate_models_cv(
-        clean_df, rs, fe, n_splits=n_splits, random_state=random_state
-    )
     return AnalysisBundle(
         rs,
         r_cnt,
@@ -136,7 +126,5 @@ def run_full_analysis(
         pv,
         leak_df,
         flagged,
-        _collect_synthetic_notes(qa, shape, flagged, combos),
-        fe,
-        cv_auc,
+        collect_synthetic_notes(qa, shape, flagged, combos),
     )

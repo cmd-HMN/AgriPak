@@ -9,24 +9,31 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 
-from src.data.analysis import CombinationResult, FeatureEngineeringResult
-from src.data.plotting.helpers import (
-    PlotArtifact,
+from src.common.dataset.columns import DatasetSchema, is_identified, resolve_drivers
+from src.common.report.plotting import PlotArtifact, qcut_series
+from src.data.analysis import CombinationResult
+from src.data.plotting.chart_helpers import (
     _barh,
     _baseline,
     _cat,
     _finish,
-    _get_drivers,
     _grid,
     _heatmap,
     _num,
     _nunique,
     _PlotSpec,
-    _qcut,
     _skip,
 )
-from src.data.schema import DatasetSchema
-from src.data.utils import is_identified
+
+
+def _qcut(s: Any, q: int = 4) -> pd.Series:
+    return qcut_series(cast(pd.Series, s), q=q)
+
+
+def _get_drivers(schema: DatasetSchema, df: pd.DataFrame | None = None) -> list[str]:
+    if df is None:
+        return []
+    return [c for c in resolve_drivers(df, schema).numeric_columns if is_identified(c)]
 
 
 def plot_pairwise_risk_heatmaps(
@@ -300,46 +307,5 @@ def plot_cramers_v_associations(
             annot=pair_v.shape[0] <= 12,
             vmin=0.0,
             vmax=1.0,
-        )
-    return _finish(fig, spec, assets_dir)
-
-
-def plot_engineered_features(
-    fe_result: FeatureEngineeringResult,
-    schema: DatasetSchema,
-    base_rate: float | None,
-    assets_dir: Path,
-) -> PlotArtifact:
-    spec: _PlotSpec = (
-        "engineered_features",
-        "engineered_features.png",
-        "Engineered Features & Correlation Comparison",
-        "Feature Engineering",
-    )
-    if fe_result.data.empty or not fe_result.engineered_columns:
-        return _skip(spec, assets_dir, "No engineered features generated.")
-    has_corr = not fe_result.correlation_comparison.empty
-    n_panels = 1 + int(has_corr)
-    fig, axes = _grid(n_panels, max_cols=n_panels, col_w=6.5, row_h=4.5)
-    first_eng = fe_result.engineered_columns[0]
-    sns.histplot(
-        cast(Any, _num(fe_result.data, first_eng).dropna()), ax=axes[0], color="#38a169"
-    )
-    axes[0].set_title(f"Distribution: {first_eng}")
-    if has_corr:
-        comp = fe_result.correlation_comparison.sort_values(
-            "abs_spearman_r", ascending=True
-        )
-        colors = [
-            "#38a169" if bool(flag) else "#718096"
-            for flag in comp["is_engineered"].tolist()
-        ]
-        _barh(
-            axes[1],
-            comp["feature"].astype(str),
-            comp["abs_spearman_r"].to_numpy(),
-            colors,
-            f"Abs Spearman vs {schema.target_column}",
-            "|Spearman r|",
         )
     return _finish(fig, spec, assets_dir)

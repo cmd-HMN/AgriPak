@@ -6,8 +6,12 @@ from typing import Any, cast
 
 import pandas as pd
 
-from src.data.schema import DatasetSchema, resolve_drivers
-from src.data.utils import UNIDENTIFIED, is_identified
+from src.common.dataset.columns import (
+    UNIDENTIFIED,
+    DatasetSchema,
+    is_identified,
+    resolve_drivers,
+)
 
 
 @dataclass(frozen=True)
@@ -26,17 +30,6 @@ class CombinationResult:
     top_synergy: pd.DataFrame
     replication_table: pd.DataFrame
     replication_rate: float
-
-
-@dataclass(frozen=True)
-class FeatureEngineeringResult:
-    data: pd.DataFrame
-    engineered_columns: tuple[str, ...]
-    raw_signal_columns: tuple[str, ...]
-    inferred_threshold: float | None
-    threshold_direction: str
-    summary_stats: pd.DataFrame
-    correlation_comparison: pd.DataFrame
 
 
 @dataclass(frozen=True)
@@ -63,8 +56,6 @@ class AnalysisBundle:
     leakage_table: pd.DataFrame
     flagged_leakage_columns: tuple[str, ...]
     synthetic_notes: tuple[str, ...]
-    feature_engineering: FeatureEngineeringResult
-    cv_auc_table: pd.DataFrame
 
 
 def _s(v: Any) -> pd.Series:
