@@ -7,11 +7,11 @@ from typing import Any, cast
 
 import pandas as pd
 
+from src.common.dataset.columns import UNIDENTIFIED, DatasetSchema
+from src.common.report.markdown import dataframe_to_markdown
 from src.data.analysis import AnalysisBundle
 from src.data.cleaning import CleaningResult
 from src.data.plotting import PlotArtifact
-from src.data.schema import DatasetSchema
-from src.data.utils import UNIDENTIFIED, dataframe_to_markdown
 
 
 def _schema_attr(
@@ -33,8 +33,8 @@ def _render_plot(
     plot = plot_map.get(plot_id)
     if plot is None:
         return f"> Plot `{fallback_title}` was not generated."
-    if not plot.generated:
-        reason = plot.note if plot.note else "no eligible data"
+    if not plot.generated or plot.path is None:
+        reason = plot.skip_reason if plot.skip_reason else "no eligible data"
         return f"> **{plot.title}** skipped: {reason}."
     rel_path = os.path.relpath(Path(plot.path), Path(report_dir)).replace(os.sep, "/")
     return f"![{plot.title}]({rel_path})"

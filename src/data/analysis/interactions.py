@@ -17,8 +17,7 @@ from src.data.analysis.types import (
     _target_series,
     _txt,
 )
-from src.data.schema import DatasetSchema
-from src.data.utils import is_identified
+from src.common.dataset.columns import DatasetSchema, is_identified
 
 
 def _build_condition_items(

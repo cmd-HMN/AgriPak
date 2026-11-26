@@ -33,14 +33,20 @@ jobs:
               run: python -m pytest src/tests -v
 
             - name: Generate data report
-              run: python -m src.data report --input data/raw --output src/data --assets src/assets
+              run: python -m src.data report --input data/raw --output src/data --assets src/data/assets
+
+            - name: Generate preprocess report
+              run: python -m src.preprocess report --input data/raw --output src/preprocess --assets src/preprocess/assets
+
+            - name: Assemble combined report
+              run: python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
 
             - name: Commit and push updated report
               if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add src/data/README.md src/assets/
+                  git add src/data/README.md src/data/report_fragment.md src/data/assets/ src/preprocess/README.md src/preprocess/report_fragment.md src/preprocess/assets/
                   if ! git diff --cached --quiet; then
                     git commit -m "docs(data): update automated data analysis report"
                     git push

@@ -8,8 +8,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.data.plotting.helpers import (
-    PlotArtifact,
+from src.common.dataset.columns import DatasetSchema, is_identified
+from src.common.report.plotting import PlotArtifact
+from src.data.plotting.chart_helpers import (
+    _PlotSpec,
     _barh,
     _baseline,
     _cat,
@@ -18,11 +20,8 @@ from src.data.plotting.helpers import (
     _heatmap,
     _num,
     _nunique,
-    _PlotSpec,
     _skip,
 )
-from src.data.schema import DatasetSchema
-from src.data.utils import is_identified
 
 
 def plot_target_distribution(

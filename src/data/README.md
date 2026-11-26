@@ -6,9 +6,9 @@
 
 ![Rows](https://img.shields.io/badge/rows-50,000-blue)
 ![Columns](https://img.shields.io/badge/columns-10-blue)
-![Plots](https://img.shields.io/badge/plots-15%2F15-brightgreen)
-![Target](https://img.shields.io/badge/target-low_yield_risk-orange)
-![Baseline](https://img.shields.io/badge/baseline-35.0%25-informational)
+![Plots](https://img.shields.io/badge/plots-11%2F14-brightgreen)
+![Target](https://img.shields.io/badge/target-fertilizer_used-orange)
+![Baseline](https://img.shields.io/badge/baseline-49.9%25-informational)
 
 **[1. Overview](#1-dataset-overview--target-balance)** |
 **[2. Statistical Audit](#2-data-quality--exploratory-statistical-audit)** |
@@ -31,9 +31,9 @@ This report is dynamically generated from `data/raw` and provides two high-level
 | --- | --- |
 | Raw input shape | `50,000` rows x `10` cols |
 | Cleaned shape | `50,000` rows x `10` cols |
-| Memory footprint | `12.59 MB` -> `1.19 MB` |
-| Inferred target | `low_yield_risk` (`35.0%` baseline) |
-| Generated charts | `15` / `15` |
+| Memory footprint | `12.59 MB` -> `1.48 MB` |
+| Inferred target | `fertilizer_used` (`49.9%` baseline) |
+| Generated charts | `11` / `14` |
 
 ---
 
@@ -43,26 +43,26 @@ Source input: `data/raw`
 
 - **Dimensions:** `50,000` rows x `10` columns (raw input `50,000` x `10`)
 - **Minimum subgroup threshold (`min_n`):** `500`
-- **Baseline positive rate:** `35.0%`
-- **Target column:** `low_yield_risk` (`binary_flag`)
-- **Primary driver:** `rainfall_mm`
+- **Baseline positive rate:** `49.9%`
+- **Target column:** `fertilizer_used` (`binary`)
+- **Primary driver:** `low_yield_risk`
 - **Secondary driver:** `temperature_c`
-- **Primary subgroup:** `weather_condition`
+- **Primary subgroup:** `soil_type`
 
 ### 1.1 Schema & Column Profiles
 
 | column | kind | role | dtype | nunique | null_count | null_pct |
 | --- | --- | --- | --- | --- | --- | --- |
 | region | categorical | feature | str | 4 | 0 | 0.00 |
-| soil_type | categorical | feature | str | 6 | 0 | 0.00 |
+| soil_type | categorical | subgroup | str | 6 | 0 | 0.00 |
 | crop | categorical | feature | str | 6 | 0 | 0.00 |
-| rainfall_mm | numeric_continuous | primary_driver | float64 | 38405 | 0 | 0.00 |
-| temperature_c | numeric_continuous | secondary_driver | float64 | 2501 | 0 | 0.00 |
-| fertilizer_used | binary_flag | feature | int64 | 2 | 0 | 0.00 |
-| irrigation_used | binary_flag | feature | int64 | 2 | 0 | 0.00 |
-| weather_condition | categorical | primary_subgroup | str | 3 | 0 | 0.00 |
-| days_to_harvest | numeric_discrete | feature | int64 | 90 | 0 | 0.00 |
-| low_yield_risk | binary_flag | target | int64 | 2 | 0 | 0.00 |
+| rainfall_mm | numeric_continuous | feature | float64 | 38405 | 0 | 0.00 |
+| temperature_c | numeric_continuous | feature | float64 | 2501 | 0 | 0.00 |
+| fertilizer_used | binary | target | int64 | 2 | 0 | 0.00 |
+| irrigation_used | binary | feature | int64 | 2 | 0 | 0.00 |
+| weather_condition | categorical | feature | str | 3 | 0 | 0.00 |
+| days_to_harvest | numeric_continuous | feature | int64 | 90 | 0 | 0.00 |
+| low_yield_risk | binary | feature | int64 | 2 | 0 | 0.00 |
 
 ### 1.2 Numeric Summary & Target Distribution
 
@@ -72,11 +72,11 @@ Source input: `data/raw`
 | temperature_c | 50000.000 | 27.428 | 7.232 | 15.000 | 21.150 | 27.420 | 33.670 | 40.000 |
 | days_to_harvest | 50000.000 | 104.606 | 25.891 | 60.000 | 82.000 | 105.000 | 127.000 | 149.000 |
 
-![Target Distribution](../assets/target_distribution.png)
+![Target Distribution](assets/target_distribution.png)
 
 **What the output says:**
-- `low_yield_risk` has `35.0%` positive class and `65.0%` negative class across `50,000` rows.
-- Raw dataset memory footprint before optimization: `1.19 MB`.
+- `fertilizer_used` has `49.9%` positive class and `50.1%` negative class across `50,000` rows.
+- Raw dataset memory footprint before optimization: `1.48 MB`.
 
 ---
 
@@ -94,7 +94,7 @@ Source input: `data/raw`
 | fertilizer_used | int8 | 50000 | 0 | 0.000 | 2 |
 | irrigation_used | int8 | 50000 | 0 | 0.000 | 2 |
 | weather_condition | category | 50000 | 0 | 0.000 | 3 |
-| days_to_harvest | int16 | 50000 | 0 | 0.000 | 90 |
+| days_to_harvest | float64 | 50000 | 0 | 0.000 | 90 |
 | low_yield_risk | int8 | 50000 | 0 | 0.000 | 2 |
 
 | column | whitespace_issues | missing_token_hits | case_variants |
@@ -102,13 +102,7 @@ Source input: `data/raw`
 | region | 0 | 0 | 0 |
 | soil_type | 0 | 0 | 0 |
 | crop | 0 | 0 | 0 |
-| rainfall_mm | 0 | 0 | 0 |
-| temperature_c | 0 | 0 | 0 |
-| fertilizer_used | 0 | 0 | 0 |
-| irrigation_used | 0 | 0 | 0 |
 | weather_condition | 0 | 0 | 0 |
-| days_to_harvest | 0 | 0 | 0 |
-| low_yield_risk | 0 | 0 | 0 |
 
 **What the output says:**
 - **Completeness:** `0` missing values across `10` columns and `0` exact duplicate rows.
@@ -116,7 +110,7 @@ Source input: `data/raw`
 
 ### 2.2 Numeric Distributions & Shape Metrics
 
-![Numeric Feature Distributions](../assets/numeric_distributions.png)
+![Numeric Feature Distributions](assets/numeric_distributions.png)
 
 | column | count | mean | std | median | iqr | min | max | skewness | kurtosis | outlier_count_iqr | outlier_pct |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -131,9 +125,9 @@ Source input: `data/raw`
 
 ### 2.3 Categorical & Binary Feature Distributions
 
-![Categorical Feature Counts](../assets/categorical_counts.png)
+![Categorical Feature Counts](assets/categorical_counts.png)
 
-![Binary Signal Prevalence](../assets/binary_flag_counts.png)
+![Binary Signal Prevalence](assets/binary_flag_counts.png)
 
 **What the output says:**
 - `region` has `4` levels; level shares range from `24.7%` to `25.2%` (largest: `South` at `25.2%`).
@@ -146,126 +140,126 @@ Source input: `data/raw`
 
 ### 2.4 Target Rate by Categorical & Binary Features
 
-![Target Rate by Category](../assets/risk_rate_by_category.png)
+![Target Rate by Category](assets/risk_rate_by_category.png)
 
 **What the output says:**
-- `region` target rate spans `34.6%` (`South`) to `35.6%` (`West`), spread `0.9` pp.
-- `soil_type` target rate spans `34.2%` (`Chalky`) to `35.7%` (`Loam`), spread `1.5` pp.
-- `crop` target rate spans `35.0%` (`Cotton`) to `35.0%` (`Barley`), spread `0.0` pp.
-- `weather_condition` target rate spans `34.9%` (`Sunny`) to `35.3%` (`Cloudy`), spread `0.4` pp.
-- `fertilizer_used` target rate spans `19.0%` (`1`) to `50.9%` (`0`), spread `31.9` pp.
-- `irrigation_used` target rate spans `22.3%` (`1`) to `47.7%` (`0`), spread `25.4` pp.
+- `region` target rate spans `49.1%` (`West`) to `51.1%` (`East`), spread `2.0` pp.
+- `soil_type` target rate spans `49.4%` (`Clay`) to `50.2%` (`Silt`), spread `0.8` pp.
+- `crop` target rate spans `49.0%` (`Barley`) to `50.5%` (`Soybean`), spread `1.5` pp.
+- `weather_condition` target rate spans `49.5%` (`Rainy`) to `50.3%` (`Cloudy`), spread `0.7` pp.
+- `irrigation_used` target rate spans `49.7%` (`0`) to `50.2%` (`1`), spread `0.5` pp.
+- `low_yield_risk` target rate spans `27.2%` (`1`) to `62.2%` (`0`), spread `35.0` pp.
 
 ### 2.5 Numeric Distributions by Target Class & Mann-Whitney U Tests
 
-![Numeric Features by Target](../assets/numeric_by_target.png)
+![Numeric Features by Target](assets/numeric_by_target.png)
 
 | feature | u_stat | p_value | p_adj_fdr | median_neg | median_pos | rank_biserial |
 | --- | --- | --- | --- | --- | --- | --- |
-| rainfall_mm | 65286936.0000 | 0.0000 | 0.0000 | 700.6300 | 295.3300 | -0.7704 |
-| fertilizer_used | 184748750.0000 | 0.0000 | 0.0000 | 1.0000 | 0.0000 | -0.3503 |
-| irrigation_used | 205022500.0000 | 0.0000 | 0.0000 | 1.0000 | 0.0000 | -0.2790 |
-| temperature_c | 260794499.5000 | 0.0000 | 0.0000 | 27.9300 | 26.4400 | -0.0829 |
-| days_to_harvest | 285286780.0000 | 0.5536 | 0.5536 | 105.0000 | 105.0000 | 0.0032 |
+| low_yield_risk | 212873065.5000 | 0.0000 | 0.0000 | 1.0000 | 0.0000 | -0.3188 |
+| temperature_c | 310693223.0000 | 0.2631 | 0.4791 | 27.4300 | 27.4100 | -0.0058 |
+| irrigation_used | 313985816.5000 | 0.2875 | 0.4791 | 0.0000 | 1.0000 | 0.0048 |
+| days_to_harvest | 311469502.5000 | 0.5234 | 0.6542 | 105.0000 | 105.0000 | -0.0033 |
+| rainfall_mm | 312471203.5000 | 0.9861 | 0.9861 | 549.6100 | 550.7700 | -0.0001 |
 
 **What the output says:**
-- `rainfall_mm`: median `700.63` (class 0) vs `295.33` (class 1), rank-biserial `-0.770`, FDR q-value `0.000e+00`.
-- `fertilizer_used`: median `1.00` (class 0) vs `0.00` (class 1), rank-biserial `-0.350`, FDR q-value `0.000e+00`.
-- `irrigation_used`: median `1.00` (class 0) vs `0.00` (class 1), rank-biserial `-0.279`, FDR q-value `0.000e+00`.
-- `temperature_c`: median `27.93` (class 0) vs `26.44` (class 1), rank-biserial `-0.083`, FDR q-value `7.280e-53`.
-- `days_to_harvest`: median `105.00` (class 0) vs `105.00` (class 1), rank-biserial `0.003`, FDR q-value `5.536e-01`.
+- `low_yield_risk`: median `1.00` (class 0) vs `0.00` (class 1), rank-biserial `-0.319`, FDR q-value `0.000e+00`.
+- `temperature_c`: median `27.43` (class 0) vs `27.41` (class 1), rank-biserial `-0.006`, FDR q-value `4.791e-01`.
+- `irrigation_used`: median `0.00` (class 0) vs `1.00` (class 1), rank-biserial `0.005`, FDR q-value `4.791e-01`.
+- `days_to_harvest`: median `105.00` (class 0) vs `105.00` (class 1), rank-biserial `-0.003`, FDR q-value `6.542e-01`.
+- `rainfall_mm`: median `549.61` (class 0) vs `550.77` (class 1), rank-biserial `-0.000`, FDR q-value `9.861e-01`.
 
 ### 2.6 Spearman Correlation & Decile Target Curves
 
-![Spearman Correlation Matrix](../assets/spearman_correlation.png)
+![Spearman Correlation Matrix](assets/spearman_correlation.png)
 
-![Quantile Target Rate Curves](../assets/decile_risk_curves.png)
+![Quantile Target Rate Curves](assets/decile_risk_curves.png)
 
 | feature | spearman_r | abs_spearman_r |
 | --- | --- | --- |
-| rainfall_mm | -0.6365 | 0.6365 |
-| fertilizer_used | -0.3342 | 0.3342 |
-| irrigation_used | -0.2662 | 0.2662 |
-| temperature_c | -0.0685 | 0.0685 |
-| days_to_harvest | 0.0026 | 0.0026 |
+| low_yield_risk | -0.3342 | 0.3342 |
+| temperature_c | -0.0050 | 0.0050 |
+| irrigation_used | 0.0048 | 0.0048 |
+| days_to_harvest | -0.0029 | 0.0029 |
+| rainfall_mm | -0.0001 | 0.0001 |
 
 **What the output says:**
-- Strongest monotonic predictor of target is `rainfall_mm` (Spearman `rho = -0.636`).
-- `rainfall_mm` decile target rate ranges from `0.2%` to `86.1%`.
-- `temperature_c` decile target rate ranges from `30.2%` to `40.1%`.
-- `days_to_harvest` decile target rate ranges from `34.3%` to `36.0%`.
+- Strongest monotonic predictor of target is `low_yield_risk` (Spearman `rho = -0.334`).
+- `rainfall_mm` decile target rate ranges from `49.3%` to `51.2%`.
+- `temperature_c` decile target rate ranges from `48.6%` to `51.2%`.
+- `days_to_harvest` decile target rate ranges from `48.9%` to `51.5%`.
 
 ### 2.7 Pairwise Interactions & Condition Combinations
 
-![Pairwise Driver Risk Heatmap](../assets/pairwise_risk_heatmaps.png)
+> **pairwise_risk_heatmaps** skipped: plot failed: too many values to unpack (expected 2).
 
-![Top Risky & Protective Combinations](../assets/top_combinations.png)
+![Top Risky & Protective Combinations](assets/top_combinations.png)
 
-Evaluated `2,389` multi-feature combinations with `n >= 500`.
+Evaluated `2,326` multi-feature combinations with `n >= 500`.
 
 #### Top Elevated-Risk Combinations
 
 | combination | k | n | target_rate | lift | synergy |
 | --- | --- | --- | --- | --- | --- |
-| fertilizer_used=0 & irrigation_used=0 & rainfall_mm<=Q25 | 3 | 3166 | 1.000 | 0.650 | -0.077 |
-| fertilizer_used=0 & rainfall_mm<=Q25 & temperature_c<=Q25 | 3 | 1597 | 0.996 | 0.646 | 0.000 |
-| fertilizer_used=0 & crop=Cotton & rainfall_mm<=Q25 | 3 | 1020 | 0.992 | 0.642 | 0.042 |
-| fertilizer_used=0 & crop=Wheat & rainfall_mm<=Q25 | 3 | 1087 | 0.990 | 0.640 | 0.040 |
-| fertilizer_used=0 & region=West & rainfall_mm<=Q25 | 3 | 1599 | 0.989 | 0.639 | 0.034 |
-| fertilizer_used=0 & soil_type=Sandy & rainfall_mm<=Q25 | 3 | 997 | 0.989 | 0.639 | 0.040 |
-| fertilizer_used=0 & soil_type=Loam & rainfall_mm<=Q25 | 3 | 1103 | 0.988 | 0.638 | 0.032 |
-| fertilizer_used=0 & weather_condition=Sunny & rainfall_mm<=Q25 | 3 | 2039 | 0.987 | 0.637 | 0.038 |
-| fertilizer_used=0 & region=East & rainfall_mm<=Q25 | 3 | 1505 | 0.987 | 0.637 | 0.037 |
-| fertilizer_used=0 & crop=Rice & rainfall_mm<=Q25 | 3 | 1033 | 0.986 | 0.636 | 0.036 |
+| low_yield_risk=0 & rainfall_mm<=Q25 & temperature_c<=Q25 | 3 | 512 | 0.988 | 0.489 | 0.358 |
+| low_yield_risk=0 & region=West & rainfall_mm<=Q25 | 3 | 696 | 0.976 | 0.476 | 0.362 |
+| low_yield_risk=0 & region=East & rainfall_mm<=Q25 | 3 | 661 | 0.970 | 0.470 | 0.336 |
+| low_yield_risk=0 & weather_condition=Sunny & rainfall_mm<=Q25 | 3 | 873 | 0.969 | 0.470 | 0.347 |
+| low_yield_risk=0 & weather_condition=Cloudy & rainfall_mm<=Q25 | 3 | 876 | 0.966 | 0.466 | 0.341 |
+| low_yield_risk=0 & rainfall_mm<=Q25 | 2 | 2612 | 0.965 | 0.466 | 0.343 |
+| low_yield_risk=0 & rainfall_mm<=Q25 & days_to_harvest<=Q25 | 3 | 632 | 0.964 | 0.464 | 0.339 |
+| low_yield_risk=0 & region=South & rainfall_mm<=Q25 | 3 | 634 | 0.962 | 0.463 | 0.342 |
+| irrigation_used=1 & low_yield_risk=0 & rainfall_mm<=Q25 | 3 | 2320 | 0.960 | 0.461 | 0.336 |
+| low_yield_risk=0 & weather_condition=Rainy & rainfall_mm<=Q25 | 3 | 863 | 0.959 | 0.460 | 0.341 |
 
 #### Top Protective Combinations
 
 | combination | k | n | target_rate | lift | synergy |
 | --- | --- | --- | --- | --- | --- |
-| fertilizer_used=1 & rainfall_mm>=Q75 | 2 | 6269 | 0.000 | -0.350 | 0.150 |
-| irrigation_used=1 & rainfall_mm>=Q75 | 2 | 6242 | 0.000 | -0.350 | 0.118 |
-| fertilizer_used=1 & irrigation_used=1 & rainfall_mm>=Q75 | 3 | 3178 | 0.000 | -0.350 | 0.277 |
-| fertilizer_used=1 & irrigation_used=0 & rainfall_mm>=Q75 | 3 | 3091 | 0.000 | -0.350 | 0.023 |
-| fertilizer_used=0 & irrigation_used=1 & rainfall_mm>=Q75 | 3 | 3064 | 0.000 | -0.350 | -0.042 |
-| fertilizer_used=1 & weather_condition=Cloudy & rainfall_mm>=Q75 | 3 | 2128 | 0.000 | -0.350 | 0.147 |
-| irrigation_used=1 & weather_condition=Sunny & rainfall_mm>=Q75 | 3 | 2098 | 0.000 | -0.350 | 0.119 |
-| irrigation_used=1 & weather_condition=Cloudy & rainfall_mm>=Q75 | 3 | 2093 | 0.000 | -0.350 | 0.115 |
-| fertilizer_used=1 & weather_condition=Sunny & rainfall_mm>=Q75 | 3 | 2085 | 0.000 | -0.350 | 0.151 |
-| fertilizer_used=1 & weather_condition=Rainy & rainfall_mm>=Q75 | 3 | 2056 | 0.000 | -0.350 | 0.151 |
+| irrigation_used=1 & low_yield_risk=1 & temperature_c>=Q75 | 3 | 1162 | 0.128 | -0.371 | -0.143 |
+| irrigation_used=1 & low_yield_risk=1 & soil_type=Peaty | 3 | 932 | 0.139 | -0.360 | -0.133 |
+| irrigation_used=1 & low_yield_risk=1 & crop=Wheat | 3 | 948 | 0.147 | -0.353 | -0.125 |
+| irrigation_used=1 & low_yield_risk=1 & region=West | 3 | 1429 | 0.152 | -0.347 | -0.114 |
+| irrigation_used=1 & low_yield_risk=1 & days_to_harvest>=Q75 | 3 | 1419 | 0.153 | -0.346 | -0.121 |
+| irrigation_used=1 & low_yield_risk=1 & region=North | 3 | 1452 | 0.156 | -0.343 | -0.115 |
+| irrigation_used=1 & low_yield_risk=1 & soil_type=Silt | 3 | 891 | 0.157 | -0.342 | -0.120 |
+| irrigation_used=1 & low_yield_risk=1 & weather_condition=Rainy | 3 | 1814 | 0.158 | -0.341 | -0.112 |
+| irrigation_used=1 & low_yield_risk=1 & crop=Cotton | 3 | 945 | 0.160 | -0.339 | -0.118 |
+| irrigation_used=1 & low_yield_risk=1 & days_to_harvest<=Q25 | 3 | 1414 | 0.160 | -0.339 | -0.117 |
 
 #### Strongest Non-Additive Synergies
 
 | combination | k | n | target_rate | lift | synergy |
 | --- | --- | --- | --- | --- | --- |
-| fertilizer_used=1 & irrigation_used=1 & rainfall_mm>=Q75 | 3 | 3178 | 0.000 | -0.350 | 0.277 |
-| fertilizer_used=1 & rainfall_mm>=Q75 & temperature_c>=Q75 | 3 | 1506 | 0.000 | -0.350 | 0.191 |
-| irrigation_used=1 & rainfall_mm>=Q75 & temperature_c>=Q75 | 3 | 1529 | 0.000 | -0.350 | 0.159 |
-| fertilizer_used=1 & soil_type=Chalky & rainfall_mm>=Q75 | 3 | 1031 | 0.000 | -0.350 | 0.158 |
-| fertilizer_used=1 & soil_type=Peaty & rainfall_mm>=Q75 | 3 | 1053 | 0.000 | -0.350 | 0.156 |
-| fertilizer_used=1 & region=South & rainfall_mm>=Q75 | 3 | 1604 | 0.000 | -0.350 | 0.154 |
-| fertilizer_used=1 & rainfall_mm>=Q75 & days_to_harvest<=Q25 | 3 | 1553 | 0.000 | -0.350 | 0.152 |
-| fertilizer_used=1 & soil_type=Sandy & rainfall_mm>=Q75 | 3 | 1076 | 0.000 | -0.350 | 0.151 |
-| fertilizer_used=1 & weather_condition=Sunny & rainfall_mm>=Q75 | 3 | 2085 | 0.000 | -0.350 | 0.151 |
-| fertilizer_used=1 & region=North & rainfall_mm>=Q75 | 3 | 1564 | 0.000 | -0.350 | 0.151 |
+| low_yield_risk=0 & region=West & rainfall_mm<=Q25 | 3 | 696 | 0.976 | 0.476 | 0.362 |
+| low_yield_risk=0 & rainfall_mm<=Q25 & temperature_c<=Q25 | 3 | 512 | 0.988 | 0.489 | 0.358 |
+| low_yield_risk=0 & weather_condition=Sunny & rainfall_mm<=Q25 | 3 | 873 | 0.969 | 0.470 | 0.347 |
+| low_yield_risk=0 & rainfall_mm<=Q25 | 2 | 2612 | 0.965 | 0.466 | 0.343 |
+| low_yield_risk=0 & region=South & rainfall_mm<=Q25 | 3 | 634 | 0.962 | 0.463 | 0.342 |
+| low_yield_risk=0 & weather_condition=Rainy & rainfall_mm<=Q25 | 3 | 863 | 0.959 | 0.460 | 0.341 |
+| low_yield_risk=0 & weather_condition=Cloudy & rainfall_mm<=Q25 | 3 | 876 | 0.966 | 0.466 | 0.341 |
+| low_yield_risk=0 & rainfall_mm<=Q25 & days_to_harvest<=Q25 | 3 | 632 | 0.964 | 0.464 | 0.339 |
+| low_yield_risk=0 & rainfall_mm<=Q25 & days_to_harvest>=Q75 | 3 | 682 | 0.959 | 0.460 | 0.337 |
+| irrigation_used=1 & low_yield_risk=0 & rainfall_mm<=Q25 | 3 | 2320 | 0.960 | 0.461 | 0.336 |
 
 **What the output says:**
 - Train/test split replication rate across top combinations: `100.0%`.
 
 ### 2.8 Continuous x Binary Interactions & Subgroup Stability
 
-![Continuous x Binary Interactions](../assets/continuous_binary_interactions.png)
+> **continuous_binary_interactions** skipped: plot failed: too many values to unpack (expected 2).
 
-![Subgroup Risk Surfaces](../assets/subgroup_risk_surfaces.png)
+> **subgroup_risk_surfaces** skipped: plot failed: not enough values to unpack (expected 2, got 0).
 
 **What the output says:**
-- Primary continuous driver `rainfall_mm` paired with secondary driver `temperature_c` across subgroup `weather_condition`.
-- Computed subgroup risk surfaces across `3` subgroup levels (each cell filtered by `n >= 500`).
+- Primary continuous driver `low_yield_risk` paired with secondary driver `temperature_c` across subgroup `soil_type`.
+- Computed subgroup risk surfaces across `6` subgroup levels (each cell filtered by `n >= 500`).
 
 ### 2.9 Kruskal-Wallis Group Tests & Cramer's V Associations
 
-![Top Kruskal-Wallis Group Differences](../assets/kruskal_wallis_boxplots.png)
+![Top Kruskal-Wallis Group Differences](assets/kruskal_wallis_boxplots.png)
 
-![Cramers V Associations](../assets/cramers_v_associations.png)
+![Cramers V Associations](assets/cramers_v_associations.png)
 
 | numeric_col | categorical_col | h_stat | p_value | p_adj_fdr | epsilon_sq | n_groups | n_total |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -284,16 +278,16 @@ Evaluated `2,389` multi-feature combinations with `n >= 500`.
 
 | feature | cramers_v | p_value |
 | --- | --- | --- |
-| fertilizer_used | 0.3342 | 0.0000 |
-| irrigation_used | 0.2661 | 0.0000 |
-| soil_type | 0.0118 | 0.2252 |
-| region | 0.0072 | 0.4651 |
-| weather_condition | 0.0038 | 0.6927 |
-| crop | 0.0001 | 1.0000 |
+| low_yield_risk | 0.3342 | 0.0000 |
+| region | 0.0147 | 0.0130 |
+| crop | 0.0096 | 0.4624 |
+| weather_condition | 0.0059 | 0.4212 |
+| soil_type | 0.0055 | 0.9100 |
+| irrigation_used | 0.0047 | 0.2916 |
 
 **What the output says:**
 - `0` of `12` numeric-by-categorical Kruskal-Wallis pairs are significant after FDR correction (`q < 0.05`).
-- Highest categorical/binary Cramer's V with target: `fertilizer_used` (`V = 0.334`).
+- Highest categorical/binary Cramer's V with target: `low_yield_risk` (`V = 0.334`).
 
 ---
 
@@ -305,76 +299,42 @@ Evaluated `2,389` multi-feature combinations with `n >= 500`.
 
 **What the output says:**
 - **Row preservation:** `50,000` rows in -> `50,000` rows out.
-- **Memory optimization:** `12.59 MB` -> `1.19 MB` (`90.5%` reduction via compact dtypes).
+- **Memory optimization:** `12.59 MB` -> `1.48 MB` (`88.2%` reduction via compact dtypes).
 
 ---
 
 ## 4. Leakage Sanity Check
 
-| feature | abs_spearman | single_feature_auc | flagged | reason |
-| --- | --- | --- | --- | --- |
-| rainfall_mm | 0.6365 | 0.8852 | False | clean |
-| fertilizer_used | 0.3342 | 0.6752 | False | clean |
-| irrigation_used | 0.2662 | 0.6395 | False | clean |
-| temperature_c | 0.0685 | 0.5415 | False | clean |
-| soil_type | 0.0118 | 0.5024 | False | clean |
-| days_to_harvest | 0.0026 | 0.5016 | False | clean |
-| region | 0.0072 | 0.5007 | False | clean |
-| weather_condition | 0.0038 | 0.4960 | False | clean |
-| crop | 0.0001 | 0.4882 | False | clean |
+| feature | metric | score | flagged |
+| --- | --- | --- | --- |
+| low_yield_risk | roc_auc | 0.6594 | False |
+| temperature_c | roc_auc | 0.5029 | False |
+| irrigation_used | roc_auc | 0.5024 | False |
+| days_to_harvest | roc_auc | 0.5016 | False |
+| rainfall_mm | roc_auc | 0.5000 | False |
+| region | cramers_v | 0.0147 | False |
+| crop | cramers_v | 0.0096 | False |
+| weather_condition | cramers_v | 0.0059 | False |
+| soil_type | cramers_v | 0.0055 | False |
 
 **What the output says:**
 - Zero columns exceeded the leakage threshold.
+- Zero exact duplicate rows detected.
+- High split-half combination replication (100.0%).
 
----
+## Preprocessing Report
 
-## 5. Feature Engineering & Model Validation
+_Report fragment `src/preprocess/report_fragment.md` has not been generated yet._
 
-- **Engineered columns:** `binary_signal_sum, primary_driver_deficit, deficit_x_zero_signal, primary_x_binary_sum`
-- **Raw signal columns:** `fertilizer_used, irrigation_used`
-- **Inferred risk threshold:** `730.87` (`below`)
+Run the following command to generate it:
 
-### 5.1 Engineered Feature Diagnostics & Target Correlations
-
-| index | column | count | mean | std | median | iqr | min | max | skewness | kurtosis | outlier_count_iqr | outlier_pct |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | binary_signal_sum | 50000 | 0.998 | 0.709 | 1.000 | 2.000 | 0.000 | 2.000 | 0.003 | -1.009 | 0 | 0.000 |
-| 1 | primary_driver_deficit | 50000 | 220.448 | 209.736 | 180.585 | 404.947 | 0.000 | 630.860 | 0.428 | -1.247 | 0 | 0.000 |
-| 2 | deficit_x_zero_signal | 50000 | 56.108 | 143.199 | 0.000 | 0.000 | 0.000 | 630.690 | 2.580 | 5.475 | 8802 | 17.604 |
-| 3 | primary_x_binary_sum | 50000 | 550.731 | 504.937 | 481.215 | 839.223 | 0.000 | 1999.840 | 0.882 | 0.214 | 0 | 0.000 |
-
-| feature | is_engineered | spearman_r | abs_spearman_r |
-| --- | --- | --- | --- |
-| primary_driver_deficit | True | 0.6417 | 0.6417 |
-| rainfall_mm | False | -0.6365 | 0.6365 |
-| primary_x_binary_sum | True | -0.6296 | 0.6296 |
-| deficit_x_zero_signal | True | 0.5336 | 0.5336 |
-| binary_signal_sum | True | -0.4235 | 0.4235 |
-| fertilizer_used | False | -0.3342 | 0.3342 |
-| irrigation_used | False | -0.2662 | 0.2662 |
-
-### 5.2 Visual Check: Engineered Risk Curves
-
-![Engineered Features & Correlation Comparison](../assets/engineered_features.png)
-
-### 5.3 Cross-Validated ROC-AUC Comparison
-
-| model_set | n_features | mean_auc | std_auc | min_auc | max_auc |
-| --- | --- | --- | --- | --- | --- |
-| raw_features | 9 | 0.9780 | 0.0005 | 0.9771 | 0.9787 |
-| engineered_only | 4 | 0.9730 | 0.0004 | 0.9725 | 0.9736 |
-| raw_plus_engineered | 13 | 0.9780 | 0.0005 | 0.9771 | 0.9786 |
-
-**How to read the CV AUC table:**
-- `raw_features` (`9` features): mean ROC-AUC `0.9780` (std `0.0005`, range `0.9771`–`0.9787`).
-- `engineered_only` (`4` features): mean ROC-AUC `0.9730` (std `0.0004`, range `0.9725`–`0.9736`).
-- `raw_plus_engineered` (`13` features): mean ROC-AUC `0.9780` (std `0.0005`, range `0.9771`–`0.9786`).
-
----
+```bash
+python -m src.preprocess --input data/raw --output data/preprocessed/cleaned.parquet
+```
 
 ## 6. CLI Exit Codes & Reproducibility
 
-| code | error_class | meaning |
+| code | name | meaning |
 | --- | --- | --- |
 | 0 | EXIT_SUCCESS | Pipeline completed successfully |
 | 2 | InvalidArgumentError | Invalid CLI or function argument |
@@ -384,16 +344,15 @@ Evaluated `2,389` multi-feature combinations with `n >= 500`.
 | 6 | MissingColumnError | Required column is missing from dataset |
 | 7 | AnalysisError | Statistical or modeling analysis failed |
 | 8 | ReportWriteError | Failed to write output or create directory |
+| 9 | TransformError | Preprocessing or feature transformation failed |
 | 99 | EXIT_UNEXPECTED | Unexpected unhandled error |
 
-Reproduce this report via:
-
 ```bash
-python -m src.data report --input data/raw --output src/data --assets src/assets
+python -m src.data --input data/raw --output-dir src/data/assets
+python -m src.preprocess --input data/raw --output data/preprocessed/cleaned.parquet
+python -m src.common.report.assembler
 ```
-
----
 
 ## License
 
-AgriPak is MIT-licensed, as found in the [LICENSE](../../LICENSE) file.
+This project is licensed under the MIT License.
