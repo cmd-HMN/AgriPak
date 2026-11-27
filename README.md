@@ -33,6 +33,7 @@ AgriPak is a Python project that provides two high-level capabilities:
 | --- | --- |
 | [Full Data Analysis Report](src/data/README.md) | Dynamically generated statistical audit, cleaning log, leakage check, and visualizations |
 | [Preprocessing Guide](src/preprocess/README.md) | Feature engineering, encoding, scaling, signal selection, and CV CLI guide |
+| [Baseline Model Guide](src/model/README.md) | Holdout Logistic Regression baseline CLI, test metrics, and exit codes |
 | [Common Utilities](src/common/README.md) | Shared schema inference, IO, centralized error codes, and report assembler |
 | [EDA Notebook](notebooks/data/d.ipynb) | Interactive data audit, cleaning, and leakage analysis (`data/clean/crop_data_clean.csv`) |
 | [Feature Engineering Notebook](notebooks/preprocess/p.ipynb) | Plot-driven feature engineering, CV validation, and feature selection (`data/clean/crop_data_features.csv`) |
