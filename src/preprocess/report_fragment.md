@@ -34,7 +34,7 @@
 | crop | drop | categorical | cramers_v | 0.010 | noise: cramers_v=0.0096 < 0.05 |
 | weather_condition | drop | categorical | cramers_v | 0.006 | noise: cramers_v=0.0059 < 0.05 |
 | binary_signal_sum | keep | engineered | spearman | 0.516 | domain_engineered_feature |
-| driver_deficit | keep | engineered | spearman |  | domain_engineered_feature |
+| driver_deficit | keep | engineered | spearman | 0.000 | domain_engineered_feature |
 
 ## 5-Fold Stratified CV & Ablation
 
