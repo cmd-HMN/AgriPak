@@ -4,7 +4,7 @@ import tokenize
 from pathlib import Path
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
-PACKAGES = ("common", "data", "preprocess")
+PACKAGES = ("common", "data", "preprocess", "model")
 
 
 def _iter_py_files(include_tests: bool) -> list[Path]:
@@ -32,9 +32,10 @@ def _extract_imports(path: Path) -> list[str]:
 
 def test_import_direction_boundaries() -> None:
     forbidden = {
-        "common": ("src.data", "src.preprocess"),
-        "data": ("src.preprocess",),
-        "preprocess": ("src.data",),
+        "common": ("src.data", "src.preprocess", "src.model"),
+        "data": ("src.preprocess", "src.model"),
+        "preprocess": ("src.data", "src.model"),
+        "model": ("src.data", "src.preprocess"),
     }
     violations: list[str] = []
     for pkg, bad_prefixes in forbidden.items():

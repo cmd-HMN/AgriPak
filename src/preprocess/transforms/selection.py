@@ -33,11 +33,10 @@ def _score_numeric_or_binary(
 ) -> float:
     s = as_series(df, col)
     series = series_to_float(s) if is_binary else to_numeric_series(s)
-    return (
-        float(compute_spearman_with_target(series, target, target))
-        if False
-        else float(series.corr(target, method="spearman") or 0.0)
-    )
+    tbl = compute_spearman_with_target(pd.DataFrame({col: series}), [col], target)
+    if tbl.empty:
+        return 0.0
+    return float(tbl["spearman_rho"].iloc[0])
 
 
 def _score_categorical(df: pd.DataFrame, col: str, target: pd.Series) -> float:

@@ -13,6 +13,11 @@ if TYPE_CHECKING:
         EvaluationResult,
         evaluate_feature_sets,
     )
+    from src.preprocess.modeling.splitting import (
+        SplitResult,
+        save_train_test_split,
+        split_train_test,
+    )
     from src.preprocess.modeling.workflow import (
         PreprocessBundle,
         run_preprocess_pipeline,
@@ -115,6 +120,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "src.preprocess.modeling.evaluation",
         "evaluate_feature_sets",
     ),
+    "SplitResult": ("src.preprocess.modeling.splitting", "SplitResult"),
+    "save_train_test_split": (
+        "src.preprocess.modeling.splitting",
+        "save_train_test_split",
+    ),
+    "split_train_test": ("src.preprocess.modeling.splitting", "split_train_test"),
     "PreprocessBundle": ("src.preprocess.modeling.workflow", "PreprocessBundle"),
     "run_preprocess_pipeline": (
         "src.preprocess.modeling.workflow",
@@ -150,6 +161,7 @@ __all__ = [
     "FeatureSelectionResult",
     "PreprocessBundle",
     "ScalingResult",
+    "SplitResult",
     "TransformError",
     "add_binary_signal_sum",
     "add_deficit_x_zero_signal",
@@ -171,8 +183,10 @@ __all__ = [
     "main",
     "render_preprocess_sections",
     "run_preprocess_pipeline",
+    "save_train_test_split",
     "scale_numeric_columns",
     "select_features",
+    "split_train_test",
 ]
 
 
