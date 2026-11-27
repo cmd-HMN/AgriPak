@@ -37,6 +37,7 @@ def _configure_extra(parser: argparse.ArgumentParser) -> None:
             "encode",
             "scale",
             "select",
+            "split",
             "evaluate",
             "plot",
             "report",
@@ -46,6 +47,9 @@ def _configure_extra(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--assets", type=Path, default=_DEFAULT_ASSETS)
     parser.add_argument("--scale-method", default="standard")
     parser.add_argument("--encode-method", default="onehot")
+    parser.add_argument("--test-size", type=float, default=0.2)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--target", type=str, default=None)
     parser.add_argument("--combined-report", type=Path, default=None)
 
 
@@ -311,6 +315,53 @@ def _cmd_report(args: argparse.Namespace, console: Console) -> int:
     return EXIT_SUCCESS
 
 
+def _cmd_split(args: argparse.Namespace, console: Console) -> int:
+    in_path = Path(args.input)
+    out_dir = (
+        Path("data/splits") if Path(args.output) == _DEFAULT_OUT else Path(args.output)
+    )
+    state: dict[str, Any] = {}
+
+    def _run(tick: Any) -> None:
+        tick("Loading modules", 0.0)
+        from src.common.core.io import load_dataset
+        from src.preprocess.modeling.splitting import (
+            save_train_test_split,
+            split_train_test,
+        )
+
+        tick("Loading dataset", 20.0)
+        df = load_dataset(in_path)
+        tick("Creating stratified split", 40.0)
+        res = split_train_test(
+            df,
+            target_column=args.target,
+            test_size=args.test_size,
+            random_state=args.seed,
+        )
+        tick("Saving train/test CSVs", 30.0)
+        state["res"] = save_train_test_split(res, out_dir, source_input=in_path)
+
+    run_with_progress(console, 100.0, "Stratified Split", _run)
+    res = state["res"]
+    print_summary_table(
+        console,
+        "Stratified Train-Test Split",
+        [
+            ("Target", res.target_column),
+            ("Seed / Test Size", f"{res.random_state} / {res.test_size:.0%}"),
+            (
+                "Train Rows",
+                f"{len(res.train_df):,} ({res.train_positive_rate:.1%} pos)",
+            ),
+            ("Test Rows", f"{len(res.test_df):,} ({res.test_positive_rate:.1%} pos)"),
+            ("Train CSV", str(res.train_path)),
+            ("Test CSV", str(res.test_path)),
+        ],
+    )
+    return EXIT_SUCCESS
+
+
 def _execute(
     args: argparse.Namespace, console: Console, _logger: logging.Logger
 ) -> int:
@@ -320,6 +371,7 @@ def _execute(
         "encode": _cmd_encode,
         "scale": _cmd_scale,
         "select": _cmd_select,
+        "split": _cmd_split,
         "evaluate": _cmd_evaluate,
         "plot": _cmd_plot,
         "report": _cmd_report,

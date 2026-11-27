@@ -2,41 +2,56 @@
 
 # AgriPak
 
-**Modular, schema-agnostic agricultural yield-risk data audit, cleaning, statistical analysis, and automated reporting.**
+**Low-yield risk prediction for agricultural fields — schema-agnostic data cleaning, leakage auditing, feature engineering, and baseline modeling.**
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests: 66 passing](https://img.shields.io/badge/tests-66%20passing-brightgreen.svg)](#testing)
+[![Tests: 72 passing](https://img.shields.io/badge/tests-72%20passing-brightgreen.svg)](#testing)
 [![Pyright: 0 errors](https://img.shields.io/badge/pyright-0%20errors-brightgreen.svg)](#testing)
-[![Report: Dynamic](https://img.shields.io/badge/report-dynamic-blue.svg)](src/data/README.md)
 
+**[More About AgriPak](#more-about-agripak)** |
 **[Installation](#installation)** |
 **[Getting Started](#getting-started)** |
-**[Notebooks & Features](#notebooks--feature-selection)** |
-**[Full Report](src/data/README.md)** |
-**[Preprocessing Guide](src/preprocess/README.md)** |
+**[Results](#results)** |
 **[CLI Reference](#cli-reference)** |
-**[Testing](#testing)** |
 **[Exit Codes](#exit-codes)** |
+**[Testing](#testing)** |
 **[License](#license)**
 
 </div>
 
 ---
 
-AgriPak is a Python workspace organized into three focused packages (`src/common/` for shared schema/IO/errors/reporting, `src/data/` for data audit/cleaning/EDA, and `src/preprocess/` for feature engineering/transforms/splits):
+AgriPak is a Python project that provides two high-level capabilities:
 
-- Schema-agnostic data auditing, cleaning, statistical exploration, leakage detection, and plot-driven feature engineering with dynamic column inference and `Unidentified` fallbacks.
-- Automated generation of reproducible Markdown reports ([src/data/README.md](src/data/README.md) and [src/preprocess/README.md](src/preprocess/README.md)) and visual assets (`src/data/assets/`, `src/preprocess/assets/`) backed by typed CLIs and GitHub Actions CI.
+- Schema-agnostic data auditing, 5-step cleaning, leakage detection, plot-driven feature engineering, and reproducible stratified 80/20 splitting with `Unidentified` fallbacks.
+- Holdout Logistic Regression baseline modeling, cross-validated benchmarks, and automated Markdown/PNG report generation backed by typed Rich CLIs and GitHub Actions CI.
 
-> **Reports:** See [**src/data/README.md**](src/data/README.md) (Full Combined Report) and [**src/preprocess/README.md**](src/preprocess/README.md) (Preprocessing Guide) for the complete statistical audit, visualizations, leakage checks, and cross-validated model results.
+## More About AgriPak
+
+| Resource | Description |
+| --- | --- |
+| [Full Data Analysis Report](src/data/README.md) | Dynamically generated statistical audit, cleaning log, leakage check, and visualizations |
+| [Preprocessing Guide](src/preprocess/README.md) | Feature engineering, encoding, scaling, signal selection, and CV CLI guide |
+| [Common Utilities](src/common/README.md) | Shared schema inference, IO, centralized error codes, and report assembler |
+| [EDA Notebook](notebooks/data/d.ipynb) | Interactive data audit, cleaning, and leakage analysis (`data/clean/crop_data_clean.csv`) |
+| [Feature Engineering Notebook](notebooks/preprocess/p.ipynb) | Plot-driven feature engineering, CV validation, and feature selection (`data/clean/crop_data_features.csv`) |
+| [Baseline Model Notebook](notebooks/models/m.ipynb) | Reproducible 80/20 stratified Logistic Regression baseline and confusion matrix |
+
+---
 
 ## Installation
 
 ### Prerequisites
 
 - Python `3.13` or higher
-- `pip` or `uv`
+- `uv` (recommended) or `pip`
+
+### Using `uv`
+
+```bash
+uv sync
+```
 
 ### Using `venv` and `pip`
 
@@ -46,120 +61,111 @@ source .venv/bin/activate
 pip install pandas numpy scipy scikit-learn matplotlib seaborn rich pytest
 ```
 
-### Using `uv`
-
-```bash
-uv sync
-```
-
 ---
 
 ## Getting Started
 
-Run the full end-to-end data pipeline, preprocessing pipeline, and combined report assembler in order:
+Run the full pipeline in order — clean and audit data, generate reproducible 80/20 stratified splits, evaluate the Logistic Regression baseline, and assemble the combined report:
 
 ```bash
-python -m src.data run --input data/raw --output src/data --assets src/data/assets
-python -m src.preprocess run --input data/raw --output src/preprocess --assets src/preprocess/assets
-python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
-```
-
-Regenerate only the reports and plots without writing intermediate CSVs:
-
-```bash
-python -m src.data report --input data/raw --output src/data --assets src/data/assets
-python -m src.preprocess report --input data/raw --output src/preprocess --assets src/preprocess/assets
-python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
+uv run python -m src.data run --input data/raw --output src/data --assets src/data/assets
+uv run python -m src.preprocess split --input data/clean/crop_data_features.csv --output data/splits --target low_yield_risk --seed 42 --test-size 0.2
+uv run python -m src.model baseline --input data/splits --target low_yield_risk
+uv run python -m src.preprocess report --input data/raw --output src/preprocess --assets src/preprocess/assets
+uv run python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
 ```
 
 ---
 
-## Notebooks & Feature Selection
+## Results
 
-Interactive notebooks split exploratory analysis and feature engineering into two focused stages:
+### Cleaning Decisions (`data/raw/crop_data.csv`, `50,000` rows × `10` cols)
 
-| Notebook | Purpose | Output |
-| --- | --- | --- |
-| [`notebooks/data/d.ipynb`](notebooks/data/d.ipynb) | Data quality audit, EDA plots, non-parametric tests, 5-step cleaning, and leakage checks | `data/clean/crop_data_clean.csv` |
-| [`notebooks/preprocess/p.ipynb`](notebooks/preprocess/p.ipynb) | Plot-driven feature engineering, 5-fold CV ROC-AUC validation, and final feature selection | `data/clean/crop_data_features.csv` |
+1. **Text normalization:** Stripped leading/trailing whitespace and scanned missing placeholder tokens (`0` issues found).
+2. **Type coercion:** Verified numeric columns (`rainfall_mm`, `temperature_c`, `days_to_harvest`) and standardized binary flags (`fertilizer_used`, `irrigation_used`, `low_yield_risk`) to `0/1`.
+3. **Range validation:** Verified `0` `±inf` values across numeric features.
+4. **Missing values & duplicates:** Verified `0` missing values and `0` exact duplicate rows (`50,000` rows preserved; fallback policy drops missing targets and imputes numeric median, binary mode, and categorical `Unidentified`).
+5. **Dtype compaction:** Cast categoricals to `category`, continuous numerics to `float64`, discrete integers to `int16`, and binary flags to `int8`, reducing memory footprint from `12.59 MB` to `1.19 MB`.
 
-### Selected Modeling Features (`8` kept, `5` dropped)
+### Baseline Model Scores (80/20 Stratified Split, `seed=42`)
 
-| Decision | Features | Reason |
-| --- | --- | --- |
-| **Keep — Raw signal (4)** | `rainfall_mm`, `fertilizer_used`, `irrigation_used`, `temperature_c` | Core pre-season drivers (`rainfall_mm` ablation drops 5-fold CV AUC from `0.978` to `0.756`); `temperature_c` carries a small but significant monotone effect (`p ≈ 0`). |
-| **Keep — Engineered (4)** | `rain_deficit`, `rain_x_inputs`, `deficit_x_noinputs`, `inputs_used` | Captures the `800 mm` zero-risk floor (`rain_deficit` `ρ = +0.639`), input-driven curve shifts (`rain_x_inputs` `ρ = -0.630`), unmitigated drought risk (`deficit_x_noinputs` `ρ = +0.509`), and monotonic input stepping (`inputs_used` `64.3% → 7.3%`). Reaches `0.978` (`LogisticRegression`) and `0.977` (`HistGradientBoosting`) 5-fold CV ROC-AUC. |
-| **Drop — Noise / Post-harvest (5)** | `days_to_harvest`, `crop`, `region`, `soil_type`, `weather_condition` | `days_to_harvest` has zero signal (`ρ = 0.003`, `p = 0.554`) and is post-harvest; the 4 categoricals sit flat at `35.0%` baseline (`Cramér's V ≤ 0.012`) and add `+0.000` CV AUC lift (`0.977` vs `0.977`). |
+Reproducible split (`40,000` train / `10,000` test, both `35.0%` positive `low_yield_risk`) saved to `data/splits/train.csv` and `data/splits/test.csv`. `StandardScaler` + `LogisticRegression(max_iter=1000, random_state=42)` fit strictly on `train.csv`:
+
+| Evaluation Run | Features | Accuracy | Precision | Recall | F1 | ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `src.model baseline` CLI (`data/splits`) | `13` | `0.9192` | `0.8895` | `0.8783` | `0.8838` | `0.9774` |
+| `notebooks/models/m.ipynb` (4 raw signals) | `4` | `0.9194` | `0.8900` | `0.8783` | `0.8841` | `0.9774` |
+| `notebooks/models/m.ipynb` (8 selected) | `8` | `0.9196` | `0.8896` | `0.8794` | `0.8845` | `0.9774` |
+
+### Leakage Sanity Check (`|correlation| > 0.90` Threshold)
+
+- **Columns flagged above `0.90`:** **None (`0` columns)**.
+- **Strongest raw predictor:** `rainfall_mm` (`|ρ| = 0.636`, single-feature AUC `0.885`) — genuine pre-season physical driver, not leakage.
+- **Temporal / post-harvest check:** `days_to_harvest` (`|ρ| = 0.003`, `p = 0.554`) is only known at or after harvest and carries zero signal, so it is excluded from pre-season modeling features.
+- **Feature selection (`8` kept / `5` dropped):** Keeps `rainfall_mm`, `temperature_c`, `fertilizer_used`, `irrigation_used` + engineered `rain_deficit`, `rain_x_inputs`, `deficit_x_noinputs`, `inputs_used`; drops `days_to_harvest`, `crop`, `region`, `soil_type`, `weather_condition` (`+0.000` CV AUC lift).
 
 ---
 
 ## CLI Reference
 
-Run `python -m src.data --help` or `python -m src.preprocess --help` for full option details.
+Run `python -m <package> --help` for full option details.
 
-### `src.data` (7 commands, `--assets src/data/assets`)
+### `src.data`
 
-| Command   | Default `--output` | Description                                                                          |
-| --------- | ------------------ | ------------------------------------------------------------------------------------ |
-| `run`     | `src/data`         | Execute the data pipeline and write cleaned CSV, plots, fragment, and report         |
-| `audit`   | `src/data/assets`  | Infer dynamic schema and run data quality and text-hygiene audit (`quality_audit.md`) |
-| `clean`   | `data/clean`       | Run the 5-step cleaning pipeline and export `cleaned_data.csv` + `cleaning_audit.md` |
-| `analyze` | `src/data/assets`  | Run full statistical EDA and leakage check (`analysis_summary.md`)                   |
-| `plot`    | `src/data/assets`  | Generate data EDA PNG charts into `src/data/assets/`                                 |
-| `report`  | `src/data`         | Run analysis, generate data charts, and write `src/data/report_fragment.md`          |
-| `help`    | —                  | Print Rich command table or help for a specific subcommand                           |
+| Command | Description |
+| --- | --- |
+| `run` | Execute full data pipeline (clean, analyze, 14 plots, fragment, combined report) |
+| `audit` | Infer dynamic schema and run data quality and text-hygiene audit |
+| `clean` | Run 5-step cleaning pipeline and export `cleaned_data.csv` |
+| `analyze` | Run statistical EDA and leakage check |
+| `plot` | Generate 14 EDA PNG charts into `--assets` (`src/data/assets`) |
+| `report` | Generate charts, `src/data/report_fragment.md`, and assemble `src/data/README.md` |
+| `help` | Print Rich CLI help panel |
 
-### `src.preprocess` (9 commands, `--assets src/preprocess/assets`)
+### `src.preprocess`
 
-| Command    | Default `--output`     | Description                                                                          |
-| ---------- | ---------------------- | ------------------------------------------------------------------------------------ |
-| `run`      | `src/preprocess`       | Execute preprocessing pipeline, splits, CV benchmarks, plots, and guide              |
-| `features` | `data/clean`           | Infer risk threshold and export `engineered_features.csv`                            |
-| `encode`   | `data/clean`           | Fit/apply categorical encoding and export encoded features                           |
-| `scale`    | `data/clean`           | Fit/apply numeric scaling and export scaled features                                 |
-| `split`    | `data/clean`           | Generate stratified train/val/test splits                                            |
-| `evaluate` | `src/preprocess/assets`| Run 5-fold CV ROC-AUC benchmarks and ablation checks                                 |
-| `plot`     | `src/preprocess/assets`| Generate feature-engineering PNG charts into `src/preprocess/assets/`                |
-| `report`   | `src/preprocess`       | Run benchmarks, generate charts, and write `src/preprocess/README.md` + fragment     |
-| `help`     | —                      | Print Rich command table or help for a specific subcommand                           |
+| Command | Description |
+| --- | --- |
+| `run` | Execute full preprocessing pipeline, CV evaluation, plots, and reports |
+| `transform` | Engineer domain features and export `engineered.csv` |
+| `encode` | Fit/apply categorical encoding (`onehot` or `ordinal`) |
+| `scale` | Fit/apply numeric scaling (`standard`, `robust`, or `minmax`) |
+| `select` | Filter signal vs noise features via Spearman and Cramér's V |
+| `split` | Create reproducible stratified 80/20 `train.csv` and `test.csv` in `data/splits` |
+| `evaluate` | Run 5-fold Stratified K-Fold CV ROC-AUC benchmarks and ablation |
+| `plot` | Generate 4 preprocessing PNG charts into `--assets` (`src/preprocess/assets`) |
+| `report` | Generate charts, `src/preprocess/README.md`, fragment, and assemble combined report |
+| `help` | Print Rich CLI help panel |
 
-### `src.common.report` (Combined Report Assembler)
+### `src.model`
+
+| Command | Description |
+| --- | --- |
+| `baseline` | Train Logistic Regression on `train.csv` and report Accuracy, Precision, Recall, F1, ROC-AUC |
+| `help` | Print Rich CLI help panel |
+
+### `src.common.report`
 
 ```bash
-python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
+uv run python -m src.common.report --data-fragment src/data/report_fragment.md --preprocess-fragment src/preprocess/report_fragment.md --output src/data/README.md
 ```
-
-### Common Flags
-
-| Flag               | Default                   | Description                                                           |
-| ------------------ | ------------------------- | --------------------------------------------------------------------- |
-| `--input`          | `data/raw`                | Input dataset file or directory (`.csv`, `.tsv`, `.json`, `.parquet`) |
-| `--output`         | Per command (table above) | Output directory for reports, audits, and exported CSVs               |
-| `--assets`         | `src/assets`              | Output directory for generated PNG plots                              |
-| `--log-dir`        | `log`                     | Directory for timestamped file logs (`log/agripak.log`, gitignored)   |
-| `--target`         | `None`                    | Optional explicit target column (auto-inferred when omitted)          |
-| `--min-n`          | `None`                    | Minimum subgroup size (defaults to `max(20, int(0.01 * n))`)          |
-| `--n-splits`       | `5`                       | Number of Stratified K-Fold cross-validation splits                   |
-| `--leak-threshold` | `0.90`                    | Single-feature association leakage threshold                          |
-| `--seed`           | `42`                      | Random seed for split replication and cross-validation                |
-| `--debug`          | `False`                   | Print full tracebacks to `stderr` on failure                          |
 
 ---
 
 ## Exit Codes
 
-| Code | Error Type | Meaning |
+| Code | Error Class | Meaning |
 | --- | --- | --- |
-| `0` | — | Success |
-| `2` | `CLIUsageError` | Invalid CLI arguments or flags |
-| `3` | `DataLoadError` | Missing, unreadable, or empty input dataset |
-| `4` | `SchemaError` | Required columns missing or invalid |
-| `5` | `ValidationError` | Data or parameter validation failure |
-| `6` | `LeakageError` | Feature-target leakage threshold exceeded |
-| `7` | `PlotError` | Chart rendering or export failure |
-| `8` | `ReportError` | Markdown report generation or assembly failure |
-| `9` | `TransformError` | Feature engineering, encoding, scaling, or split failure |
-| `99` | `Exception` | Unexpected unhandled error |
+| `0` | `EXIT_SUCCESS` | Pipeline completed successfully |
+| `2` | `InvalidArgumentError` | Invalid CLI or function argument |
+| `3` | `InputNotFoundError` | Input file or directory not found |
+| `4` | `EmptyDataError` | Input dataset is empty or has no remaining rows |
+| `5` | `MalformedDataError` | Input file is malformed or unsupported |
+| `6` | `MissingColumnError` | Required column is missing from dataset |
+| `7` | `AnalysisError` | Statistical or modeling analysis failed |
+| `8` | `ReportWriteError` | Failed to write output or create directory |
+| `9` | `TransformError` | Preprocessing or feature transformation failed |
+| `99` | `EXIT_UNEXPECTED` | Unexpected unhandled error |
 
 ---
 
@@ -168,20 +174,17 @@ python -m src.common.report --data-fragment src/data/report_fragment.md --prepro
 All tests use deterministic synthetic fixtures and run completely offline:
 
 ```bash
-python -m pytest src/tests -v
+uv run python -m pytest src/tests -v
 ```
 
-With `uv`:
+Static type check and lint:
 
 ```bash
-uv run --no-sync --with pytest python -m pytest src/tests -v
+uvx pyright --pythonpath .venv/bin/python src/common src/data src/preprocess src/model src/tests
+uvx ruff check src/common src/data src/preprocess src/model src/tests
 ```
 
-Static type check:
-
-```bash
-uvx pyright --pythonpath .venv/bin/python src/
-```
+---
 
 ## License
 

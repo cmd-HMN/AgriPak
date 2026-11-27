@@ -1,94 +1,92 @@
 <div align="center">
 
-# AgriPak Preprocess
+# AgriPak Preprocessing & Feature Engineering
 
-**Dynamic feature engineering, encoding, scaling, signal selection, and cross-validated model evaluation.**
-
-[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](../../LICENSE)
-
-**[Getting Started](#getting-started)** |
-**[Commands](#commands)** |
-**[Features](#features)** |
-**[Exit Codes](#exit-codes)** |
-**[Full Report](../data/README.md)** |
-**[Project README](../../README.md)** |
-**[License](#license)**
+[Combined Report](../data/README.md) · [Repository Root](../../README.md)
 
 </div>
 
----
+## Pipeline Order
 
-AgriPak Preprocess provides two high-level capabilities:
+1. `infer_schema` (dynamic column/target/driver detection)
+2. `engineer_features` (binary signal sum, driver deficit, interactions)
+3. `select_features` (Spearman & Cramer's V filtering)
+4. `encode_categorical_columns` & `scale_numeric_columns`
+5. `evaluate_feature_sets` (5-fold StratifiedKFold ROC-AUC + ablation)
+## Preprocessing & Feature Engineering
 
-- Plot-driven dynamic feature engineering, categorical encoding, numeric scaling, and Spearman / Cramér's V signal-vs-noise selection with `Unidentified` fallbacks.
-- Stratified K-Fold cross-validation benchmarks (`LogisticRegression` and `HistGradientBoostingClassifier`), ablation checks, PNG chart generation, and automated Markdown reporting.
+- **Rows / Columns:** `50,000` rows, `10` raw columns -> `14` processed columns
+- **Primary Driver:** `low_yield_risk` (inferred risk floor threshold: `0.00`)
+- **Binary Signal Columns (3):** `fertilizer_used, irrigation_used, low_yield_risk`
+- **Engineered Features (4):** `binary_signal_sum, driver_deficit, deficit_x_zero_signal, driver_x_signal_sum`
 
----
+### Engineered Feature Definitions
 
-## Getting Started
+1. `binary_signal_sum`: Row-wise sum of active binary risk flags (`3` columns), capturing cumulative risk.
+2. `driver_deficit`: `max(0, 0.00 - low_yield_risk)`, isolating shortfall below the positive-class median.
+3. `deficit_x_zero_signal`: Interaction `driver_deficit * I(binary_signal_sum == 0)`, capturing silent-risk cases.
+4. `driver_x_signal_sum`: Interaction `low_yield_risk * binary_signal_sum`, scaling driver magnitude by active flag count.
 
-Run the full preprocessing pipeline, generate charts, and write the report:
+## Feature Selection & Transformation Summary
+
+- **Selected Features (6):** `fertilizer_used, low_yield_risk, binary_signal_sum, driver_deficit, deficit_x_zero_signal, driver_x_signal_sum`
+- **Dropped Noise Features (8):** `rainfall_mm, temperature_c, days_to_harvest, irrigation_used, region, soil_type, crop, weather_condition`
+- **Encoding (`onehot`):** `0` categorical -> `0` encoded columns
+- **Scaling (`standard`):** `4` numeric columns (`2` zero-variance)
+
+### Selection Manifest
+
+| feature | decision | group | signal_metric | signal_value | reason |
+| --- | --- | --- | --- | --- | --- |
+| rainfall_mm | drop | numeric | spearman | -0.000 | noise: \|spearman\|=0.0001 < 0.03 |
+| temperature_c | drop | numeric | spearman | -0.005 | noise: \|spearman\|=0.0050 < 0.03 |
+| days_to_harvest | drop | numeric | spearman | -0.003 | noise: \|spearman\|=0.0029 < 0.03 |
+| fertilizer_used | keep | binary | spearman | 1.000 | \|spearman\|=1.0000 >= 0.03 |
+| irrigation_used | drop | binary | spearman | 0.005 | noise: \|spearman\|=0.0048 < 0.03 |
+| low_yield_risk | keep | binary | spearman | -0.334 | \|spearman\|=0.3342 >= 0.03 |
+| region | drop | categorical | cramers_v | 0.015 | noise: cramers_v=0.0147 < 0.05 |
+| soil_type | drop | categorical | cramers_v | 0.005 | noise: cramers_v=0.0055 < 0.05 |
+| crop | drop | categorical | cramers_v | 0.010 | noise: cramers_v=0.0096 < 0.05 |
+| weather_condition | drop | categorical | cramers_v | 0.006 | noise: cramers_v=0.0059 < 0.05 |
+| binary_signal_sum | keep | engineered | spearman | 0.516 | domain_engineered_feature |
+| driver_deficit | keep | engineered | spearman |  | domain_engineered_feature |
+
+## 5-Fold Stratified CV & Ablation
+
+- **Primary Driver Ablation Delta (HGB):** `+0.0000` ROC-AUC
+- **Noise Removal Lift (HGB):** `+0.0000` ROC-AUC
+
+### Cross-Validation Results
+
+| feature_set | n_features | logreg_roc_auc | logreg_std | hgb_roc_auc | hgb_std |
+| --- | --- | --- | --- | --- | --- |
+| raw_signal | 2 | 1.000 | 0.000 | 1.000 | 0.000 |
+| engineered_only | 4 | 0.884 | 0.003 | 0.884 | 0.003 |
+| raw_plus_engineered | 6 | 1.000 | 0.000 | 1.000 | 0.000 |
+| all_raw_features | 10 | 1.000 | 0.000 | 1.000 | 0.000 |
+| ablation_no_primary_driver | 5 | 1.000 | 0.000 | 1.000 | 0.000 |
+
+## Run
 
 ```bash
-python -m src.preprocess run --input data/raw --output src/preprocess --assets src/preprocess/assets
+uv run python -m src.preprocess run --input data/raw --output src/preprocess --assets src/preprocess/assets
+uv run python -m src.preprocess evaluate --input data/raw
+uv run python -m src.preprocess plot --input data/raw --assets src/preprocess/assets
 ```
 
-Regenerate only the preprocess report, fragment, and charts:
-
-```bash
-python -m src.preprocess report --input data/raw --output src/preprocess --assets src/preprocess/assets
-```
-
----
-
-## Commands
-
-| Command | Description |
-| --- | --- |
-| `run` | Execute full preprocessing pipeline, CV evaluation, plots, and reports |
-| `transform` | Engineer domain features and export `engineered.csv` |
-| `encode` | Fit and apply categorical encoding (`onehot` or `ordinal`) |
-| `scale` | Fit and apply numeric scaling (`standard`, `robust`, or `minmax`) |
-| `select` | Filter signal vs noise features and export `selected_features.csv` + `feature_manifest.csv` |
-| `evaluate` | Run 5-fold Stratified K-Fold CV ROC-AUC benchmarks and ablation |
-| `plot` | Generate preprocessing PNG charts into `--assets` |
-| `report` | Generate `README.md`, `report_fragment.md`, and assemble combined report |
-| `help` | Print CLI command table and options |
-
-Key flags: `--input` (`data/raw`), `--output` (`src/preprocess`), `--assets` (`src/preprocess/assets`), `--scale-method` (`standard`), `--encode-method` (`onehot`), `--combined-report`, `--log-dir` (`log`), `--debug`.
-
----
-
-## Features
-
-| Feature | Definition | Purpose |
+| code | name | meaning |
 | --- | --- | --- |
-| `binary_signal_sum` | Sum of active binary management signals (`0 / 1 / 2`) | Captures monotonic risk reduction across combined inputs |
-| `primary_driver_deficit` | `max(0, threshold - primary_driver)` | Linearizes the inferred risk-floor boundary |
-| `deficit_x_zero_signal` | `primary_driver_deficit * (binary_signal_sum == 0)` | Isolates unmitigated drought-risk regime |
-| `primary_x_binary_sum` | `primary_driver * binary_signal_sum` | Encodes curve shift across input levels |
-
-Unidentifiable columns fall back to `Unidentified` without crashing.
-
----
-
-## Exit Codes
-
-| Code | Error Class | Meaning |
-| --- | --- | --- |
-| `0` | `EXIT_SUCCESS` | Pipeline completed successfully |
-| `2` | `InvalidArgumentError` | Invalid CLI or function argument |
-| `3` | `InputNotFoundError` | Input file or directory not found |
-| `4` | `EmptyDataError` | Input dataset is empty or has no remaining rows |
-| `5` | `MalformedDataError` | Input file is malformed or unsupported |
-| `6` | `MissingColumnError` | Required column is missing from dataset |
-| `8` | `ReportWriteError` | Failed to write output or create directory |
-| `9` | `TransformError` | Preprocessing or feature transformation failed |
-| `99` | `EXIT_UNEXPECTED` | Unexpected unhandled error |
-
----
+| 0 | EXIT_SUCCESS | Pipeline completed successfully |
+| 2 | InvalidArgumentError | Invalid CLI or function argument |
+| 3 | InputNotFoundError | Input file or directory not found |
+| 4 | EmptyDataError | Input dataset is empty or has no remaining rows |
+| 5 | MalformedDataError | Input file is malformed or unsupported |
+| 6 | MissingColumnError | Required column is missing from dataset |
+| 7 | AnalysisError | Statistical or modeling analysis failed |
+| 8 | ReportWriteError | Failed to write output or create directory |
+| 9 | TransformError | Preprocessing or feature transformation failed |
+| 99 | EXIT_UNEXPECTED | Unexpected unhandled error |
 
 ## License
 
-AgriPak is MIT-licensed, as found in the [LICENSE](../../LICENSE) file.
+MIT
